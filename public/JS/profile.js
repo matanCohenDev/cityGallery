@@ -1,6 +1,15 @@
-// ===== tiny helpers =====
+// =====================
+// CityGallery — Profile
+// Clean rewrite: helpers, API, UI, rendering, modals, filters, paging
+// =====================
+
+// ----- tiny helpers -----
 const $  = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+
+function htmlEscape(s){
+  return String(s ?? '').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
 
 function fmtExact(iso) {
   const d = new Date(iso);
@@ -10,11 +19,13 @@ function fmtExact(iso) {
   });
 }
 
+// ----- API -----
 async function api(path, method = 'GET', body) {
   const isForm = body instanceof FormData;
   const headers = isForm ? {} : { 'Content-Type': 'application/json' };
   const res = await fetch(path, {
-    method, headers,
+    method,
+    headers,
     body: isForm ? body : (body ? JSON.stringify(body) : undefined),
     credentials: 'include'
   });
@@ -25,7 +36,7 @@ async function api(path, method = 'GET', body) {
   return data;
 }
 
-// ===== user header =====
+// ===================== USER HEADER =====================
 let CURRENT_USER = null;
 
 async function loadUser() {
@@ -33,28 +44,32 @@ async function loadUser() {
     const me = await api('/api/users/me');
     CURRENT_USER = me || null;
 
-    $('#userBadge').textContent = `Signed in as ${me.username || me.user?.username || 'User'}`;
-    $('#profileName').textContent = me.username || me.user?.username || 'My Profile';
-    $('#profileSubtitle').textContent = me.bio || 'Your posts and stats';
+    const username = me?.username || me?.user?.username || 'User';
+    const bio = me?.bio || 'Your posts and stats';
+
+    $('#userBadge')?.replaceChildren(document.createTextNode(`Signed in as ${username}`));
+    $('#profileName')?.replaceChildren(document.createTextNode(username));
+    $('#profileSubtitle')?.replaceChildren(document.createTextNode(bio));
+
     return me;
   } catch {
-    $('#userBadge').textContent = 'Not signed in';
+    $('#userBadge')?.replaceChildren(document.createTextNode('Not signed in'));
     CURRENT_USER = null;
     return null;
   }
 }
 
-// ===== logout =====
+// Logout
 $('#logoutBtn')?.addEventListener('click', async () => {
   try { await api('/api/users/logout', 'POST'); }
   catch (e) { console.warn('Logout error:', e.message); }
   finally {
     CURRENT_USER = null;
-    window.location.href = '/index.html';
+    location.href = '/index.html';
   }
 });
 
-// ===== state =====
+// ===================== STATE =====================
 let page = 1;
 let pages = 1;
 let loading = false;
@@ -64,7 +79,7 @@ let mine  = []; // רק שלי
 // זיהוי פוסט שהוא שלי
 function isMine(post, me) {
   if (!me || !post) return false;
-  const meId = me._id || me.id || me.user?.id || me.user?._id || null;
+  const meId = me._id || me.id || me.user?._id || me.user?.id || null;
   const meUsername = me.username || me.user?.username || null;
   const meEmail = me.email || me.user?.email || null;
 
@@ -79,7 +94,12 @@ function isMine(post, me) {
   return false;
 }
 
-// ===== skeletons =====
+function hasImage(p){
+  const imgs = Array.isArray(p.images) ? p.images : [];
+  return imgs.some(u => typeof u === 'string' && u.trim().length);
+}
+
+// ===================== SKELETONS =====================
 function skeletonGrid(targetUl, n = 6) {
   const ul = $(targetUl);
   if (!ul) return;
@@ -101,14 +121,7 @@ function skeletonGrid(targetUl, n = 6) {
   }
 }
 
-// ===== render =====
-function htmlEscape(s){return String(s ?? '').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-
-function hasImage(p){
-  const imgs = Array.isArray(p.images) ? p.images : [];
-  return imgs.some(u => typeof u === 'string' && u.trim().length);
-}
-
+// ===================== RENDER =====================
 function cardTemplate(p){
   const title = htmlEscape(p.title || '');
   const when  = p.createdAt ? fmtExact(p.createdAt) : '';
@@ -160,82 +173,44 @@ function renderTwoGrids(filtered){
   renderGridTo('#gridNo',   noArr);
 
   // empty states
-  $('#emptyWith').classList.toggle('hidden', withArr.length !== 0);
-  $('#emptyNo').classList.toggle('hidden', noArr.length   !== 0);
+  $('#emptyWith')?.classList.toggle('hidden', withArr.length !== 0);
+  $('#emptyNo')?.classList.toggle('hidden', noArr.length   !== 0);
 
   // counts
-  $('#countWith').textContent = `(${withArr.length})`;
-  $('#countNo').textContent   = `(${noArr.length})`;
+  $('#countWith')?.replaceChildren(document.createTextNode(`(${withArr.length})`));
+  $('#countNo')?.replaceChildren(document.createTextNode(`(${noArr.length})`));
 }
 
-// ===== modal: create post (like feed) =====
-const modal = $('#modal');
-function lockScroll(yes){ document.body.style.overflow = yes ? 'hidden' : ''; }
-function openModal(){ if(!modal) return; modal.classList.remove('hidden'); lockScroll(true); }
-function closeModal(){ if(!modal) return; modal.classList.add('hidden'); lockScroll(false); }
-
-$('#newPostBtn')?.addEventListener('click', openModal);
-$('#closeModal')?.addEventListener('click', closeModal);
-$('#cancelPost')?.addEventListener('click', closeModal);
-
-// סגירה בלחיצה מחוץ לכרטיס/ESC
-modal?.addEventListener('click', (e)=>{ if(e.target === modal) closeModal(); });
-document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape' && !modal?.classList.contains('hidden')) closeModal(); });
-
-function syncNoSectionVisibility(){
-  const only = !!$('#imagesOnly')?.checked;
-  $('#sectionNo').classList.toggle('hidden', only);
-}
-
-const imageFileEl = document.querySelector('input[name="imageFile"]');
-const previewBox = $('#imagePreview');
-
-imageFileEl?.addEventListener('change', () => {
-  const f = imageFileEl.files?.[0];
-  if (!f) { previewBox?.classList.add('hidden'); if(previewBox) previewBox.innerHTML = ''; return; }
-  const url = URL.createObjectURL(f);
-  if (previewBox){
-    previewBox.innerHTML = `<img src="${url}" alt="preview"><small class="muted">${f.name} • ${(f.size/1024).toFixed(1)} KB</small>`;
-    previewBox.classList.remove('hidden');
-  }
-});
-
-async function uploadImage(file) {
-  const fd = new FormData();
-  fd.append('image', file); // חשוב: השם 'image' תואם ל-upload.single('image')
-  const res = await fetch('/api/uploads', { method: 'POST', body: fd, credentials: 'include' });
-  if (!res.ok) {
-    const txt = await res.text().catch(()=> '');
-    throw new Error(`Upload failed (${res.status}): ${txt || res.statusText}`);
-  }
-  return await res.json(); // { url: "/uploads/xxxx.jpg" }
-}
-
-// ===== view modal =====
+// ===================== QUICK VIEW MODAL =====================
 const viewModal = $('#viewModal');
 const viewBody  = $('#viewBody');
-function lockScrollView(yes){ document.body.style.overflow = yes ? 'hidden' : ''; }
-function openView(){ viewModal.classList.remove('hidden'); lockScrollView(true); }
-function closeView(){ viewModal.classList.add('hidden'); lockScrollView(false); }
+
+function lockScroll(yes){ document.body.style.overflow = yes ? 'hidden' : ''; }
+
+function openView(){ viewModal?.classList.remove('hidden'); lockScroll(true); }
+function closeView(){ viewModal?.classList.add('hidden');  lockScroll(false); }
+
 $('#closeView')?.addEventListener('click', closeView);
 viewModal?.addEventListener('click', (e)=>{ if (e.target === viewModal) closeView(); });
-document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && !viewModal.classList.contains('hidden')) closeView(); });
+document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && !viewModal?.classList.contains('hidden')) closeView(); });
 
 function openPreview(p){
-  $('#viewTitle').textContent = p.title || 'Post';
+  $('#viewTitle')?.replaceChildren(document.createTextNode(p.title || 'Post'));
   const img = hasImage(p) ? `<img class="view-cover" src="${p.images[0]}" alt="">` : '';
-  viewBody.innerHTML = `
-    ${img}
-    <div>
-      <div class="muted" style="margin-bottom:6px">${fmtExact(p.createdAt || Date.now())}</div>
-      <h3 style="margin:.2em 0">${htmlEscape(p.title || '(No title)')}</h3>
-      <p style="margin:.4em 0; white-space:pre-wrap">${htmlEscape(p.content || '')}</p>
-    </div>
-  `;
+  if (viewBody){
+    viewBody.innerHTML = `
+      ${img}
+      <div>
+        <div class="muted" style="margin-bottom:6px">${fmtExact(p.createdAt || Date.now())}</div>
+        <h3 style="margin:.2em 0">${htmlEscape(p.title || '(No title)')}</h3>
+        <p style="margin:.4em 0; white-space:pre-wrap">${htmlEscape(p.content || '')}</p>
+      </div>
+    `;
+  }
   openView();
 }
 
-// ===== filters & sort =====
+// ===================== FILTERS & SORT =====================
 function currentQuery(){
   return {
     q: ($('#q')?.value || '').trim().toLowerCase(),
@@ -259,7 +234,27 @@ function applyLocal(items){
   else if (sort === 'old') out.sort((a,b)=> new Date(a.createdAt) - new Date(b.createdAt));
   else if (sort === 'title') out.sort((a,b)=> (a.title||'').localeCompare(b.title||''));
 
-  return out; // imagesOnly נשלט ברמת סקשן דרך syncNoSectionVisibility
+  return out; // imagesOnly נשלט ברמת סקשן
+}
+
+function syncNoSectionVisibility(){
+  const only = !!$('#imagesOnly')?.checked;
+  $('#sectionNo')?.classList.toggle('hidden', only);
+}
+
+function updateStats(all, filtered){
+  const total = all.length;
+  const withImgAll = all.filter(hasImage).length;
+  const withImgFiltered = filtered.filter(hasImage).length;
+  const noImgFiltered   = filtered.length - withImgFiltered;
+
+  $('#heroStats')?.replaceChildren(
+    ...[
+      `Total: ${total}`,
+      `Posts: ${withImgAll}`,
+      `Statuses: ${noImgFiltered}`,
+    ].map(t => { const s = document.createElement('span'); s.className='stat-pill'; s.textContent=t; return s; })
+  );
 }
 
 function refreshGrids(){
@@ -269,22 +264,7 @@ function refreshGrids(){
   syncNoSectionVisibility();
 }
 
-// ===== stats =====
-function updateStats(all, filtered){
-  const total = all.length;
-  const withImgAll = all.filter(hasImage).length;
-  const withImgFiltered = filtered.filter(hasImage).length;
-  const noImgFiltered   = filtered.length - withImgFiltered;
-
-  $('#heroStats').innerHTML = `
-    <span class="stat-pill">Total: ${total}</span>
-    <span class="stat-pill">With images: ${withImgAll}</span>
-    <span class="stat-pill">Showing img: ${withImgFiltered}</span>
-    <span class="stat-pill">Showing no-img: ${noImgFiltered}</span>
-  `;
-}
-
-// ===== data load =====
+// ===================== DATA LOAD =====================
 async function loadMine({append=false} = {}){
   if (loading) return;
   loading = true;
@@ -309,22 +289,21 @@ async function loadMine({append=false} = {}){
 
     // רק שלי בצד לקוח
     mine = cache.filter(p => isMine(p, CURRENT_USER));
-
     refreshGrids();
   }catch(e){
     console.error(e);
     if (!append){
-      $('#gridWith').innerHTML = '';
-      $('#gridNo').innerHTML = '';
-      $('#emptyWith').classList.remove('hidden');
-      $('#emptyNo').classList.remove('hidden');
+      $('#gridWith') && ($('#gridWith').innerHTML = '');
+      $('#gridNo')   && ($('#gridNo').innerHTML   = '');
+      $('#emptyWith')?.classList.remove('hidden');
+      $('#emptyNo')?.classList.remove('hidden');
     }
   }finally{
     loading = false;
   }
 }
 
-// ===== infinite scroll =====
+// Infinite scroll
 function nearBottom(){
   const px = document.documentElement.scrollHeight - (window.scrollY + window.innerHeight);
   return px < 300;
@@ -336,12 +315,51 @@ window.addEventListener('scroll', async ()=>{
   }
 });
 
-// ===== live controls =====
+// Live controls
 $('#q')?.addEventListener('input', refreshGrids);
 $('#imagesOnly')?.addEventListener('change', refreshGrids);
 $('#sort')?.addEventListener('change', refreshGrids);
 
-// ===== create-post form handlers =====
+// ===================== CREATE-POST MODAL =====================
+const modal = $('#modal');
+function openModal(){ modal?.classList.remove('hidden'); lockScroll(true); }
+function closeModal(){ modal?.classList.add('hidden');   lockScroll(false); }
+
+$('#openCreatePost')?.addEventListener('click', openModal);
+$('#newPostBtn')?.addEventListener('click', openModal);
+$('#emptyNewPost1')?.addEventListener('click', openModal);
+$('#emptyNewPost2')?.addEventListener('click', openModal);
+$('#closeModal')?.addEventListener('click', closeModal);
+$('#cancelPost')?.addEventListener('click', closeModal);
+modal?.addEventListener('click', (e)=>{ if(e.target === modal) closeModal(); });
+document.addEventListener('keydown', (e)=>{ if(e.key === 'Escape' && !modal?.classList.contains('hidden')) closeModal(); });
+
+// Image file preview + upload helper
+const imageFileEl = document.querySelector('input[name="imageFile"]');
+const previewBox = $('#imagePreview');
+
+imageFileEl?.addEventListener('change', () => {
+  const f = imageFileEl.files?.[0];
+  if (!f) { previewBox?.classList.add('hidden'); if(previewBox) previewBox.innerHTML = ''; return; }
+  const url = URL.createObjectURL(f);
+  if (previewBox){
+    previewBox.innerHTML = `<img src="${url}" alt="preview"><small class="muted">${f.name} • ${(f.size/1024).toFixed(1)} KB</small>`;
+    previewBox.classList.remove('hidden');
+  }
+});
+
+async function uploadImage(file) {
+  const fd = new FormData();
+  fd.append('image', file); // upload.single('image')
+  const res = await fetch('/api/uploads', { method: 'POST', body: fd, credentials: 'include' });
+  if (!res.ok) {
+    const txt = await res.text().catch(()=> '');
+    throw new Error(`Upload failed (${res.status}): ${txt || res.statusText}`);
+  }
+  return await res.json(); // { url: "/uploads/xxxx.jpg" }
+}
+
+// Create post form
 function clearFormFields(form){
   form.reset();
   if (previewBox){ previewBox.classList.add('hidden'); previewBox.innerHTML = ''; }
@@ -362,15 +380,15 @@ $('#saveDraft')?.addEventListener('click', async () => {
   const visibility = f.visibility?.value || 'public';
   const allowComments = !!f.allowComments?.checked;
 
-  if (!title && !content) { alert('Nothing to save. Add a title or content.'); return; }
+  if (!title && !content) { return showToast('Nothing to save. Add a title or content', 'error'); }
 
   try {
     const payload = { title, content, tags, location, visibility, allowComments, status: 'draft' };
     await api('/api/posts', 'POST', payload);
-    alert('Draft saved');
+    showToast('Draft saved ✔', 'ok');
     clearFormFields(f);
   } catch (e) {
-    alert('Save draft error: ' + e.message);
+    showToast('Save draft error: ' + e.message, 'error');
   }
 });
 
@@ -385,7 +403,7 @@ $('#postForm')?.addEventListener('submit', async (e) => {
   const visibility = f.visibility?.value || 'public';
   const allowComments = !!f.allowComments?.checked;
 
-  if (!title || !content) { alert('Please fill title and content'); return; }
+  if (!title || !content) { return showToast('Please fill title and content', 'error'); }
 
   try {
     const payload = { title, content, tags, location, visibility, allowComments, status: 'published' };
@@ -404,20 +422,165 @@ $('#postForm')?.addEventListener('submit', async (e) => {
     page = 1; pages = 1; cache = []; mine = [];
     await loadMine();
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast('Post published ✔', 'ok');
   } catch (e) {
-    alert('Create post error: ' + e.message);
+    showToast('Create post error: ' + e.message, 'error');
   }
 });
 
-// גם כפתורי empty-state יפתחו את המודל
-$('#newPostBtn')?.addEventListener('click', openModal);
-$('#emptyNewPost1')?.addEventListener('click', openModal);
-$('#emptyNewPost2')?.addEventListener('click', openModal);
+// ===================== SETTINGS MODAL =====================
+const settingsModal   = $('#settingsModal');
+const settingsForm    = $('#settingsForm');
+const btnOpenSettings = $('#openSettings');
+const btnClose        = $('#closeSettings');
+const btnCancel       = $('#cancelSettings');
+const btnSave         = $('#saveSettings');
+const toastEl         = $('#toast');
 
-// ===== init =====
-(async function init(){
+function showToast(msg, type='ok'){
+  if (!toastEl) return;
+  toastEl.textContent = msg;
+  toastEl.classList.remove('hidden','ok','error');
+  toastEl.classList.add(type);
+  setTimeout(()=> toastEl.classList.add('hidden'), 2200);
+}
+
+async function prefillSettings(){
+  try{
+    const me = CURRENT_USER || await api('/api/users/me');
+    CURRENT_USER = me;
+    const username = me?.username || me?.user?.username || '';
+    const email    = me?.email    || me?.user?.email    || '';
+    settingsForm.username.value = username;
+    settingsForm.email.value    = email;
+    settingsForm.currentPassword.value = '';
+    settingsForm.newPassword.value     = '';
+    settingsForm.confirmPassword.value = '';
+  }catch(e){ /* ignore */ }
+}
+
+function openSettings(){
+  if (!settingsModal) return;
+  prefillSettings();
+  settingsModal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSettings(){
+  if (!settingsModal) return;
+  settingsModal.classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+btnOpenSettings?.addEventListener('click', (e) => { e.preventDefault(); openSettings(); });
+btnClose?.addEventListener('click', closeSettings);
+btnCancel?.addEventListener('click', closeSettings);
+settingsModal?.addEventListener('click', (e)=>{ if (e.target === settingsModal) closeSettings(); });
+document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && !settingsModal?.classList.contains('hidden')) closeSettings(); });
+
+async function tryProfileUpdate(body){
+  const endpoints = [
+    { url: '/api/users/me',      method: 'PATCH' },
+    { url: '/api/users/profile', method: 'PATCH' },
+    { url: '/api/users/update',  method: 'PUT'   },
+  ];
+  for (const ep of endpoints){
+    try{
+      await api(ep.url, ep.method, body);
+      return true;
+    }catch(e){
+      // המשך ניסיון אם זו שגיאת מסלול/מתוד
+      if (String(e.message).match(/^(400|404|405)/)) continue;
+      throw e;
+    }
+  }
+  throw new Error('Profile update endpoint not found');
+}
+
+async function tryPasswordChange(currentPassword, newPassword){
+  const options = [
+    { url:'/api/users/change-password', method:'POST' , body:{ currentPassword, newPassword } },
+    { url:'/api/users/me/password',     method:'PATCH', body:{ currentPassword, newPassword } },
+    { url:'/api/users/password',        method:'PUT'  , body:{ currentPassword, newPassword } },
+  ];
+  for (const ep of options){
+    try{
+      await api(ep.url, ep.method, ep.body);
+      return true;
+    }catch(e){
+      if (String(e.message).match(/^(400|404|405)/)) continue;
+      throw e;
+    }
+  }
+  throw new Error('Password change endpoint not found');
+}
+
+settingsForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const username        = settingsForm.username.value.trim();
+  const email           = settingsForm.email.value.trim();
+  const currentPassword = settingsForm.currentPassword.value;
+  const newPassword     = settingsForm.newPassword.value;
+  const confirmPassword = settingsForm.confirmPassword.value;
+
+  // ולידציה בסיסית
+  if (newPassword || confirmPassword) {
+    if (newPassword.length < 6)   return showToast('Password must be at least 6 chars', 'error');
+    if (newPassword !== confirmPassword) return showToast('New passwords do not match', 'error');
+    if (!currentPassword)         return showToast('Enter current password to change it', 'error');
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return showToast('Invalid email', 'error');
+
+  btnSave?.setAttribute('disabled','disabled');
+
+  try{
+    // עדכון פרופיל
+    const toUpdate = {};
+    if (username) toUpdate.username = username;
+    if (email)    toUpdate.email    = email;
+    if (Object.keys(toUpdate).length) {
+      await tryProfileUpdate(toUpdate);
+    }
+
+    // שינוי סיסמה (אם ביקש)
+    if (newPassword){
+      await tryPasswordChange(currentPassword, newPassword);
+    }
+
+    // רענון תצוגה בראש
+    try {
+      const me = await api('/api/users/me');
+      CURRENT_USER = me;
+      const un = me?.username || me?.user?.username || 'User';
+      const bio = me?.bio || 'Your posts and stats';
+      $('#userBadge')?.replaceChildren(document.createTextNode(`Signed in as ${un}`));
+      $('#profileName')?.replaceChildren(document.createTextNode(un));
+      $('#profileSubtitle')?.replaceChildren(document.createTextNode(bio));
+    } catch {}
+
+    showToast('Settings saved ✔', 'ok');
+    closeSettings();
+  }catch(err){
+    console.error(err);
+    showToast(err.message || 'Failed to save settings', 'error');
+  }finally{
+    btnSave?.removeAttribute('disabled');
+  }
+});
+
+// ===================== INIT =====================
+async function init(){
   await loadUser();
   page = 1; pages = 1;
   await loadMine();
   syncNoSectionVisibility();
-})();
+}
+
+// Run when DOM is ready (defer on script as well)
+if (document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
