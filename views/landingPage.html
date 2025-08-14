@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <title>CityGallery — Share Your City</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="CityGallery — a clean social network for photo galleries with maps and groups." />
+  <link rel="stylesheet" href="/CSS/landingPage.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="container nav">
+      <a class="brand" href="#">
+        <span class="logo" aria-hidden="true"></span>
+        <span class="brand-name">CityGallery</span>
+      </a>
+      <nav class="links" aria-label="Primary">
+        <button id="logoutBtn" class="link">Log out</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero (fills the screen between header & footer) -->
+  <main class="hero">
+    <div class="container hero__grid">
+      <!-- Left: Content -->
+      <section class="content">
+        <h1>Galleries. Map. Community.<br><span class="accent">All in a clean, modern space.</span></h1>
+        <p class="lead">
+          CityGallery helps you share the places you love through photos.
+          Pin posts to a live map, follow creators, and build your own visual story — with a calm, elegant design.
+        </p>
+
+        <ul class="features">
+          <li>
+            <div class="ic" aria-hidden="true">📷</div>
+            <div>
+              <strong>Fast uploads</strong>
+              <div class="muted">Drag & drop or select files — captions and tags included.</div>
+            </div>
+          </li>
+          <li>
+            <div class="ic" aria-hidden="true">🗺️</div>
+            <div>
+              <strong>Smart map</strong>
+              <div class="muted">Discover photos by location and explore neighborhoods.</div>
+            </div>
+          </li>
+          <li>
+            <div class="ic" aria-hidden="true">👥</div>
+            <div>
+              <strong>Profiles & groups</strong>
+              <div class="muted">Follow creators you love and join interest-based groups.</div>
+            </div>
+          </li>
+        </ul>
+
+        <div class="stats">
+          <div class="stat"><span class="num">12k+</span><span class="lbl">photos shared</span></div>
+          <div class="divider"></div>
+          <div class="stat"><span class="num">3.5k</span><span class="lbl">active creators</span></div>
+          <div class="divider"></div>
+          <div class="stat"><span class="num">120</span><span class="lbl">cities mapped</span></div>
+        </div>
+
+      </section>
+
+      <!-- Right: Auth Card -->
+      <aside class="auth card" aria-label="Authentication">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="login"    role="tab" aria-selected="true">Log in</button>
+          <button class="tab"        data-tab="register" role="tab" aria-selected="false">Register</button>
+        </div>
+
+        <form id="loginForm" class="panel active" autocomplete="on">
+          <label>Username
+            <input name="username" placeholder="Your username" required />
+          </label>
+          <label>Password
+            <input name="password" type="password" placeholder="••••••••" required />
+          </label>
+          <button type="submit" class="btn btn--primary full">Log in</button>
+          <p class="hint">New here? Switch to <strong>Register</strong>.</p>
+        </form>
+
+        <form id="registerForm" class="panel" autocomplete="on">
+          <label>Username
+            <input name="username" placeholder="Choose a username" required />
+          </label>
+          <label>Email
+            <input name="email" type="email" placeholder="you@example.com" required />
+          </label>
+          <label>Password
+            <input name="password" type="password" minlength="6" placeholder="At least 6 characters" required />
+          </label>
+          <button type="submit" class="btn btn--primary full">Create account</button>
+          <p class="hint">Already have an account? Switch to <strong>Log in</strong>.</p>
+        </form>
+      </aside>
+    </div>
+
+    <!-- Decorative background collage (no interaction) -->
+    <div class="bg-shapes" aria-hidden="true">
+      <div class="blob b1"></div>
+      <div class="blob b2"></div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer__row">
+      <span>© <span id="year"></span> CityGallery</span>
+      <span class="muted">Made for sharing cities — clean & timeless</span>
+    </div>
+  </footer>
+
+  <script src="/JS/landingPage.js"></script>
+</body>
+</html>
