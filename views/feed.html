@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <title>CityGallery — Feed</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="CityGallery feed — posts from people you follow." />
+  <link rel="stylesheet" href="/CSS/feed.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="container nav">
+      <a class="brand" href="/index.html">
+        <span class="logo" aria-hidden="true"></span>
+        <span class="brand-name">CityGallery</span>
+      </a>
+
+      <!-- New: top nav -->
+      <nav class="topnav" aria-label="Primary">
+        <a class="toplink" href="/profile">My Profile</a>
+        <a class="toplink" href="/settings">Settings</a>
+      </nav>
+
+      <div class="nav-actions">
+        <span id="userBadge" class="badge muted">Not signed in</span>
+        <button id="newPostBtn" class="btn btn--primary">New Post</button>
+        <button id="logoutBtn" class="btn">Log out</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Toolbar -->
+  <section class="toolbar">
+    <div class="container toolbar__row">
+      <div class="input-wrap" role="search">
+        <input id="q" class="input" placeholder="Search posts…" aria-label="Search posts" />
+      </div>
+
+      <div class="filters" role="region" aria-label="Filters">
+        <label class="chk">
+          <input type="checkbox" id="imagesOnly" />
+          <span>With images only</span>
+        </label>
+        <label class="lbl">Day
+          <input id="day" class="input" type="date" />
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feed -->
+  <main class="feed container">
+    <ul id="feedList" class="feed-list" aria-live="polite"></ul>
+
+    <div id="empty" class="empty hidden">
+      <div class="empty__card">
+        <div class="empty__icon">🌆</div>
+        <h3>No posts yet</h3>
+        <p class="muted">Try a different search, or create the very first post.</p>
+        <button class="btn btn--primary" id="emptyNewPost">Create Post</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Create Post Modal -->
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal__card" role="document">
+      <div class="modal__header">
+        <h3 id="modalTitle">Create a new post</h3>
+        <button id="closeModal" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+
+      <form id="postForm" class="modal__body">
+        <fieldset class="fieldset">
+          <legend>Content</legend>
+          <label>Title
+            <input class="input" name="title" placeholder="A moment in the city" required />
+          </label>
+          <label>Content
+            <textarea class="input" name="content" rows="4" placeholder="Write a short caption…" required></textarea>
+          </label>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend>Media</legend>
+          <label>Image (local)
+            <input class="input" name="imageFile" type="file" accept="image/*" />
+          </label>
+          <div id="imagePreview" class="img-preview hidden" aria-live="polite"></div>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend>Options</legend>
+          <div class="grid2">
+            <label>Tags (comma separated)
+              <input class="input" name="tags" placeholder="street, sunset, food" />
+            </label>
+            <label>Location
+              <input class="input" name="location" placeholder="Tel Aviv, IL" />
+            </label>
+          </div>
+
+          <div class="grid2">
+            <label>Visibility
+              <select class="input" name="visibility" aria-label="Visibility">
+                <option value="public">Public</option>
+                <option value="friends">Friends</option>
+                <option value="private">Private</option>
+              </select>
+            </label>
+
+            <label class="switch">
+              <input type="checkbox" name="allowComments" checked />
+              <span>Allow comments</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="actions">
+          <button type="button" class="btn" id="clearForm">Clear</button>
+          <button type="button" class="btn" id="saveDraft">Save as Draft</button>
+          <button type="button" class="btn" id="cancelPost">Cancel</button>
+          <button type="submit" class="btn btn--primary">Publish</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/JS/feed.js"></script>
+</body>
+</html>
