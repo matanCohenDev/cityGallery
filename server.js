@@ -6,6 +6,13 @@ require('dotenv').config();
 
 const app = express();
 
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'dev-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { httpOnly: true }
+}));
+
 // Parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -14,12 +21,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Session (in-memory לפיתוח; לפרודקשן מומלץ connect-mongo)
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'dev-secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { httpOnly: true }
-}));
 
 // DB
 mongoose.connect(process.env.MONGO_URI, {})

@@ -7,6 +7,25 @@
   <meta name="description" content="Your posts and stats." />
   <link rel="stylesheet" href="/CSS/feed.css" />
   <link rel="stylesheet" href="/CSS/profile.css" />
+  <style>
+    /* תוספות קלות ל-UI של קבוצות (נשען על ה-design הקיים) */
+    .groups-grid{ list-style:none;margin:0;padding:0;display:grid;gap:14px;grid-template-columns:repeat(12,1fr) }
+    .groups-grid .card{ grid-column:span 6; display:flex;gap:10px;align-items:center }
+    .group__meta{ display:grid; gap:4px; flex:1; padding:8px 0 }
+    .group__name{ margin:0; font-weight:700 }
+    .group__desc{ margin:0; color:#475569; font-size:.95rem }
+    .pill{ display:inline-block; padding:4px 8px; border-radius:999px; border:1px solid var(--line); background:#fff; font-size:.85rem; color:#334155 }
+    @media (max-width:860px){ .groups-grid .card{ grid-column:span 12 } }
+
+    /* כפתורי Post */
+    .btn-danger{background:#ef4444;color:#fff;border:0}
+    .btn-danger:hover{filter:brightness(1.05)}
+
+    /* מודאל יצירת קבוצה */
+    .modal .hint{ color:#64748b; font-size:.9rem }
+    .modal .row{ display:grid; gap:10px; grid-template-columns:1fr 1fr }
+    @media (max-width:640px){ .modal .row{ grid-template-columns:1fr } }
+  </style>
 </head>
 <body>
   <!-- Header -->
@@ -42,8 +61,37 @@
     </div>
   </section>
 
-  <!-- Two-section layout -->
+  <!-- Main -->
   <main class="container profile-main">
+
+    <!-- Groups (NEW) -->
+    <section class="profile-section" id="sectionGroups">
+      <div class="section-head">
+        <h2>My Groups</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="refreshGroups" class="btn">Refresh</button>
+          <button id="openCreateGroup2" class="btn btn--primary">Create Group</button>
+        </div>
+      </div>
+
+      <div class="profile-section">
+        <ul id="gridAdminGroups" class="groups-grid" aria-live="polite"></ul>
+        
+      </div>
+
+      <div class="profile-section">
+        <ul id="gridMemberGroups" class="groups-grid" aria-live="polite"></ul>
+        <div id="emptyMemberGroups" class="empty hidden">
+          <div class="empty__card">
+            <div class="empty__icon">👥</div>
+            <h3>No joined groups</h3>
+            <p class="muted">Join public groups from the feed or create your own.</p>
+            <button class="btn" id="emptyCreateGroup2">Create Group</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- With images -->
     <section class="profile-section" id="sectionWith">
       <div class="section-head">
@@ -94,6 +142,7 @@
           <label>Content
             <textarea class="input" name="content" rows="4" placeholder="Write a short caption…" required></textarea>
           </label>
+        </fieldset>
         <fieldset class="fieldset">
           <legend>Media</legend>
           <label>Image (local)
@@ -101,7 +150,6 @@
           </label>
           <div id="imagePreview" class="img-preview hidden" aria-live="polite"></div>
         </fieldset>
-
         <div class="actions">
           <button type="button" class="btn" id="clearForm">Clear</button>
           <button type="button" class="btn" id="cancelPost">Cancel</button>
@@ -111,7 +159,7 @@
     </div>
   </div>
 
-  <!-- View modal (quick preview) -->
+  <!-- Quick view modal -->
   <div id="viewModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="viewTitle">
     <div class="modal__card view-modal" role="document">
       <div class="modal__header">
@@ -163,10 +211,7 @@
     </div>
   </div>
 
-  <!-- Toast -->
-  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
-
-  <!-- Edit modal -->
+  <!-- Edit post modal -->
   <div id="editModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="editTitle">
     <div class="modal__card view-modal" role="document">
       <div class="modal__header">
@@ -174,9 +219,7 @@
         <button id="closeEdit" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <form id="editForm" class="modal__body" novalidate>
-        <div id="editPreviewBox">
-          <!-- תמונה תוצג כאן דינמית -->
-        </div>
+        <div id="editPreviewBox"></div>
         <fieldset class="fieldset">
           <legend>Content</legend>
           <label>Title
@@ -205,6 +248,51 @@
     </div>
   </div>
 
+  <!-- Create Group modal (NEW) -->
+  <div id="groupModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="groupTitle">
+    <div class="modal__card" role="document">
+      <div class="modal__header">
+        <h3 id="groupTitle">Create a new group</h3>
+        <button id="closeGroup" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <form id="groupForm" class="modal__body" novalidate>
+        <fieldset class="fieldset">
+          <legend>Basics</legend>
+          <div class="row">
+            <label>Name
+              <input class="input" name="name" placeholder="Tel-Aviv Photography" required />
+            </label>
+            <label>Visibility
+              <select class="input" name="visibility">
+                <option value="public" selected>Public (anyone can view & join)</option>
+                <option value="private">Private (invite / approval)</option>
+              </select>
+            </label>
+          </div>
+          <label>Description
+            <textarea class="input" name="description" rows="3" placeholder="What is this group about?" required></textarea>
+          </label>
+          <div class="hint">You’ll be the first admin. You can add more later.</div>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend>Cover</legend>
+          <label>Cover image
+            <input class="input" name="coverFile" type="file" accept="image/*" />
+          </label>
+          <div id="groupCoverPreview" class="img-preview hidden" aria-live="polite"></div>
+        </fieldset>
+
+        <div class="actions">
+          <button type="button" class="btn" id="cancelGroup">Cancel</button>
+          <button type="submit" class="btn btn--primary">Create group</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
   <script src="/JS/profile.js" defer></script>
 </body>

@@ -74,3 +74,48 @@ exports.deleteGroup = async (req, res, next) => {
     res.json({ msg: 'Group deleted', id: g._id });
   } catch (err) { next(err); }
 };
+
+
+// GET /api/groups
+// תומך: q, mine=1
+exports.listGroups = async (req, res, next) => {
+  try {
+    const { q, mine } = req.query;
+
+    const textFilter = q ? { name: { $regex: q, $options: 'i' } } : {};
+    let baseFilter = { ...textFilter };
+
+    if (String(mine) === '1' || String(mine).toLowerCase() === 'true') {
+      // אם ביקשו רק את הקבוצות של המשתמש – חייב להיות מחובר
+      if (!req.session?.userId) {
+        return res.status(401).json({ msg: 'Unauthorized' });
+      }
+      const uid = req.session.userId;
+      baseFilter = {
+        ...textFilter,
+        $or: [{ owner: uid }, { members: uid }],
+      };
+    }
+
+    const list = await Group.find(baseFilter)
+      .populate('owner', 'username')
+      .lean();
+
+    res.json(list);
+  } catch (err) { next(err); }
+};
+
+// GET /api/groups/mine
+exports.listMyGroups = async (req, res, next) => {
+  try {
+    if (!req.session?.userId) {
+      return res.status(401).json({ msg: 'Unauthorized' });
+    }
+    const uid = req.session.userId;
+    const list = await Group.find({ $or: [{ owner: uid }, { members: uid }] })
+      .populate('owner', 'username')
+      .lean();
+
+    res.json(list);
+  } catch (err) { next(err); }
+};
