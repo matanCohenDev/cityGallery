@@ -92,7 +92,7 @@ async function loadUser(){
     CURRENT_USER=null; return null;
   }
 }
-$('#logoutBtn')?.addEventListener('click', async ()=>{ try{ await api('/api/users/logout','POST') } finally { location.href='/index.html' }});
+$('#logoutBtn')?.addEventListener('click', async ()=>{ try{ await api('/api/users/logout','POST') } finally { location.href='/' }});
 
 /* ---------- State ---------- */
 let page=1, pages=1, loading=false, cache=[], mine=[];
@@ -332,14 +332,16 @@ const gridAdminGroups = $('#gridAdminGroups');
 // חשוב: ב-HTML אין אלמנט עם id="gridMemberGroups", לכן נשתמש ב-#gridMyGroups
 const gridMemberGroups= $('#gridMyGroups');
 
-function groupCardTemplate(g, { isOwner = false } = {}){
+function groupCardTemplate(g){
   const id    = g._id || g.id;
   const name  = g.name || 'Group';
   const desc  = g.description || '';
-  const isPublic = g.isPublic === true;
-  const members = (g.membersCount ?? (Array.isArray(g.members) ? g.members.length : undefined) ?? 1);
-
   const coverUrl = getGroupCoverUrl(g);
+
+  // ← זה כל הקסם: קביעה האם המשתמש הנוכחי הוא הבעלים
+  const ownerId  = String(g.owner?._id || g.owner || '');
+  const meId     = String(CURRENT_USER?._id || CURRENT_USER?.id || '');
+  const isOwner  = ownerId && meId && ownerId === meId;
 
   const li = document.createElement('li');
   li.className = 'group-card';
@@ -367,26 +369,22 @@ function groupCardTemplate(g, { isOwner = false } = {}){
     </div>
   `;
 
-  // ✅ מאזין הכפתור בתוך הסקופ הנכון (ללא ReferenceError)
   li.querySelector('[data-action="members"]')?.addEventListener('click', (e)=>{
     e.preventDefault();
     openMembersModal(id, name);
   });
 
-   if (isOwner) {
-   li.querySelector('[data-action="delete"]')?.addEventListener('click', async (e)=>{
-     e.preventDefault();
-    try{
-       const ok = await deleteGroupById(id);
-       if (ok) {
-        // הסר את הכרטיס מה־DOM
-         li.remove();
-       }
-    }catch(err){
-       showToast(err.message || 'Failed to delete group','error');
-     }
-   });
- }
+  if (isOwner) {
+    li.querySelector('[data-action="delete"]')?.addEventListener('click', async (e)=>{
+      e.preventDefault();
+      try{
+        const ok = await deleteGroupById(id);
+        if (ok) li.remove();
+      }catch(err){
+        showToast(err.message || 'Failed to delete group','error');
+      }
+    });
+  }
 
   return li;
 }

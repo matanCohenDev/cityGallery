@@ -16,8 +16,9 @@
         <span class="brand-name">CityGallery</span>
       </a>
       <nav class="links" aria-label="Primary">
-        <button id="logoutBtn" class="link">Log out</button>
+        <button id="logoutBtn" class="link" style="display:none">Back to feed</button>
       </nav>
+
     </div>
   </header>
 
@@ -63,6 +64,36 @@
           <div class="divider"></div>
           <div class="stat"><span class="num">120</span><span class="lbl">cities mapped</span></div>
         </div>
+        <!-- Metrics (NEW) -->
+        <section class="metrics">
+          <div class="container">
+            <div class="metrics-head">
+              <h2 class="metrics-title">Community activity</h2>
+              <p class="metrics-sub muted">Live snapshot from the last days</p>
+            </div>
+
+            <div class="metrics-grid">
+              <article class="metric-card">
+                <header class="metric-card__head">
+                  <h3>Posts in the last 14 days</h3>
+                </header>
+                <div class="metric-card__body">
+                  <canvas id="chartPosts14" height="120"></canvas>
+                </div>
+              </article>
+
+              <article class="metric-card">
+                <header class="metric-card__head">
+                  <h3>Top 5 groups by size</h3>
+                </header>
+                <div class="metric-card__body">
+                  <canvas id="chartTopGroups" height="120"></canvas>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
 
       </section>
 
@@ -114,7 +145,7 @@
       <span class="muted">Made for sharing cities — clean & timeless</span>
     </div>
   </footer>
-
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="/JS/landingPage.js"></script>
 </body>
 </html>

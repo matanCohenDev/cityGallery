@@ -114,25 +114,135 @@ input:focus{outline:none;box-shadow:0 0 0 3px rgba(96,165,250,.35)}
 .full{width:100%}
 .hint{color:#64748b;font-size:.9rem;margin:6px 0 0}
 
-/* ===== Background decor ===== */
 .bg-shapes .blob{
   position:absolute; filter:blur(30px); opacity:.18; z-index:-1; border-radius:50%;
 }
 .b1{width:380px;height:380px;right:-80px;top:10%;background:conic-gradient(from 30deg, #60a5fa, #a78bfa, #60a5fa)}
 .b2{width:460px;height:460px;left:-120px;bottom:10%;background:conic-gradient(from 160deg, #34d399, #22d3ee, #34d399)}
 
-/* ===== Footer ===== */
 .footer{
   height:60px; display:grid; align-items:center; background:#ffffff; border-top:1px solid #e5e7eb;
 }
 .footer__row{display:flex;justify-content:space-between;align-items:center}
 .muted{color:#64748b}
 
-/* ===== Responsive ===== */
+/* ===== Metrics (landing) — polished ===== */
+:root{
+  /* שמרתי על הפלטה שלך, רק ריכזתי כמשתנים */
+  --c-bg:#ffffff;
+  --c-line:#e5e7eb;
+  --c-muted:#64748b;
+  --c-text:#0f172a;
+  --c-grad-top:#ffffff;
+  --c-grad-bot:#f8fafc;
+  --shadow-lg:0 16px 40px rgba(15,23,42,.08);
+  --radius:16px;
+  --pad:14px;
+}
+
+.metrics{
+  margin: 18px 0 26px;
+}
+.metrics-head{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom: 12px;
+}
+.metrics-title{
+  margin:0;
+  font-size: clamp(18px, 2.2vw, 22px);
+  font-weight: 800;
+  letter-spacing: .2px;
+}
+.metrics-sub{
+  margin:0;
+  color: var(--c-muted);
+  font-size: .95rem;
+}
+
+/* גריד: 2 עמודות בשולחן עבודה, 1 במובייל/טאבלט */
+.metrics-grid{
+  display:grid;
+  gap:16px;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 1024px){
+  .metrics-grid{ grid-template-columns: 1fr; }
+}
+
+/* כרטיסים */
+.metric-card{
+  background: var(--c-bg);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  display:grid;
+  grid-template-rows: auto 1fr;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.metric-card:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 18px 44px rgba(15,23,42,.10);
+  border-color: #dbe3ee;
+}
+
+/* כותרת הכרטיס */
+.metric-card__head{
+  padding: 12px var(--pad);
+  border-bottom: 1px solid var(--c-line);
+  background: linear-gradient(180deg, var(--c-grad-top), var(--c-grad-bot));
+}
+.metric-card__head h3{
+  margin:0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--c-text);
+}
+
+/* גוף הכרטיס + קנבס */
+.metric-card__body{
+  padding: 12px var(--pad) 14px;
+  display: grid;
+}
+.metric-card__body canvas{
+  width: 100% !important;
+  height: 200px !important; /* גובה נעים בשולחן עבודה */
+  display: block;
+}
+
+/* התאמות מובייל */
+@media (max-width: 640px){
+  .metric-card__body canvas{
+    height: 220px !important;
+  }
+}
+
+/* קונטיינר הכללי – קו דק בין החלקים */
+.metrics + .footer{ border-top:1px solid var(--c-line); }
+
+/* טויקים כלליים שתומכים בעיצוב הכרטיסים (רשות, אבל מוסיף ניקיון) */
+.stat .num{ font-size: 19px; }
+.stat .lbl{ font-size: .85rem; }
+
+/* מצב נגישות – מניעת תזוזות באנימציה אם המשתמש ביקש */
+@media (prefers-reduced-motion: reduce){
+  .metric-card{ transition: none; }
+  .metric-card:hover{ transform:none; }
+}
+
+
 @media (max-width: 980px){
   .hero__grid{grid-template-columns:1fr}
   .mini-gallery{grid-template-columns:repeat(6,1fr)}
 }
 @media (max-width: 640px){
   .mini-gallery{grid-template-columns:repeat(3,1fr)}
+}
+
+.auth-locked {
+  opacity: .6;
+  pointer-events: none; /* מונע גם קליקים על כל מה שבפנים */
 }

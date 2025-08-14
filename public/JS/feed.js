@@ -46,7 +46,7 @@ $('#logoutBtn')?.addEventListener('click', async () => {
   try {
     await api('/api/users/logout', 'POST');
     await loadUser();
-    window.location.href = '/index.html';
+    window.location.href = '/';
   } catch (e) { alert('Logout error: ' + e.message); }
 });
 
