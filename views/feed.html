@@ -19,7 +19,6 @@
       <!-- New: top nav -->
       <nav class="topnav" aria-label="Primary">
         <a class="toplink" href="/profile">My Profile</a>
-        <a class="toplink" href="/settings">Settings</a>
       </nav>
 
       <div class="nav-actions">
@@ -90,36 +89,8 @@
           <div id="imagePreview" class="img-preview hidden" aria-live="polite"></div>
         </fieldset>
 
-        <fieldset class="fieldset">
-          <legend>Options</legend>
-          <div class="grid2">
-            <label>Tags (comma separated)
-              <input class="input" name="tags" placeholder="street, sunset, food" />
-            </label>
-            <label>Location
-              <input class="input" name="location" placeholder="Tel Aviv, IL" />
-            </label>
-          </div>
-
-          <div class="grid2">
-            <label>Visibility
-              <select class="input" name="visibility" aria-label="Visibility">
-                <option value="public">Public</option>
-                <option value="friends">Friends</option>
-                <option value="private">Private</option>
-              </select>
-            </label>
-
-            <label class="switch">
-              <input type="checkbox" name="allowComments" checked />
-              <span>Allow comments</span>
-            </label>
-          </div>
-        </fieldset>
-
         <div class="actions">
           <button type="button" class="btn" id="clearForm">Clear</button>
-          <button type="button" class="btn" id="saveDraft">Save as Draft</button>
           <button type="button" class="btn" id="cancelPost">Cancel</button>
           <button type="submit" class="btn btn--primary">Publish</button>
         </div>
