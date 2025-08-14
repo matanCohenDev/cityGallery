@@ -19,11 +19,12 @@
 
       <nav class="topnav" aria-label="Primary">
         <a class="toplink" href="/feed" aria-current="page">Feed</a>
-        <a class="toplink" href="/settings">Settings</a>
+        <a class="toplink" id="openSettings" href="#">Settings</a>
       </nav>
 
       <div class="nav-actions">
         <span id="userBadge" class="badge muted">Not signed in</span>
+        <button id="newPostBtn" class="btn btn--primary">New Post</button>
         <button id="logoutBtn" class="btn">Log out</button>
       </div>
     </div>
@@ -35,11 +36,11 @@
       <div class="avatar xl" id="avatarHero" aria-hidden="true"></div>
       <div class="hero__meta">
         <h1 id="profileName">My Profile</h1>
-        <p class="muted" id="profileSubtitle">Your posts and stats</p>
+        <p class="muted" id="profileSubtitle">Your posts and statuses</p>
         <div class="hero__stats" id="heroStats" aria-live="polite"></div>
       </div>
       <div class="hero__actions">
-        <button id="newPostBtn" class="btn btn--primary">New Post</button>
+        <button id="openCreatePost" class="btn btn--primary">Create</button>
       </div>
     </div>
   </section>
@@ -49,7 +50,7 @@
     <!-- With images -->
     <section class="profile-section" id="sectionWith">
       <div class="section-head">
-        <h2>Posts with images <span class="count" id="countWith">(0)</span></h2>
+        <h2>posts<span class="count" id="countWith">(0)</span></h2>
       </div>
       <ul id="gridWith" class="card-grid" aria-live="polite"></ul>
       <div id="emptyWith" class="empty hidden">
@@ -65,7 +66,7 @@
     <!-- Without images -->
     <section class="profile-section" id="sectionNo">
       <div class="section-head">
-        <h2>Posts without images <span class="count" id="countNo">(0)</span></h2>
+        <h2>statuses<span class="count" id="countNo">(0)</span></h2>
       </div>
       <ul id="gridNo" class="card-grid card-grid--noimg" aria-live="polite"></ul>
       <div id="emptyNo" class="empty hidden">
@@ -78,6 +79,7 @@
       </div>
     </section>
   </main>
+
   <!-- Create Post Modal -->
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal__card" role="document">
@@ -86,7 +88,7 @@
         <button id="closeModal" class="icon-btn" aria-label="Close">✕</button>
       </div>
 
-      <form id="postForm" class="modal__body">
+      <form id="postForm" class="modal__body" novalidate>
         <fieldset class="fieldset">
           <legend>Content</legend>
           <label>Title
@@ -95,8 +97,6 @@
           <label>Content
             <textarea class="input" name="content" rows="4" placeholder="Write a short caption…" required></textarea>
           </label>
-        </fieldset>
-
         <fieldset class="fieldset">
           <legend>Media</legend>
           <label>Image (local)
@@ -105,36 +105,8 @@
           <div id="imagePreview" class="img-preview hidden" aria-live="polite"></div>
         </fieldset>
 
-        <fieldset class="fieldset">
-          <legend>Options</legend>
-          <div class="grid2">
-            <label>Tags (comma separated)
-              <input class="input" name="tags" placeholder="street, sunset, food" />
-            </label>
-            <label>Location
-              <input class="input" name="location" placeholder="Tel Aviv, IL" />
-            </label>
-          </div>
-
-          <div class="grid2">
-            <label>Visibility
-              <select class="input" name="visibility" aria-label="Visibility">
-                <option value="public">Public</option>
-                <option value="friends">Friends</option>
-                <option value="private">Private</option>
-              </select>
-            </label>
-
-            <label class="chk">
-              <input type="checkbox" name="allowComments" checked />
-              <span>Allow comments</span>
-            </label>
-          </div>
-        </fieldset>
-
         <div class="actions">
           <button type="button" class="btn" id="clearForm">Clear</button>
-          <button type="button" class="btn" id="saveDraft">Save as Draft</button>
           <button type="button" class="btn" id="cancelPost">Cancel</button>
           <button type="submit" class="btn btn--primary">Publish</button>
         </div>
@@ -153,6 +125,50 @@
     </div>
   </div>
 
-  <script src="/JS/profile.js"></script>
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal__card" role="document">
+      <div class="modal__header">
+        <h3 id="settingsTitle">Settings</h3>
+        <button id="closeSettings" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+
+      <form id="settingsForm" class="modal__body" novalidate>
+        <fieldset class="fieldset">
+          <legend>Profile</legend>
+          <label>Username
+            <input class="input" name="username" placeholder="Your username" />
+          </label>
+          <label>Email
+            <input class="input" name="email" type="email" placeholder="you@example.com" />
+          </label>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend>Password</legend>
+          <label>Current password
+            <input class="input" name="currentPassword" type="password" autocomplete="current-password" />
+          </label>
+          <label>New password
+            <input class="input" name="newPassword" type="password" autocomplete="new-password" />
+          </label>
+          <label>Confirm new password
+            <input class="input" name="confirmPassword" type="password" autocomplete="new-password" />
+          </label>
+          <small class="muted">השאר ריק אם אינך מעדכן סיסמה</small>
+        </fieldset>
+
+        <div class="actions">
+          <button type="button" class="btn" id="cancelSettings">Cancel</button>
+          <button type="submit" class="btn btn--primary" id="saveSettings">Save changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script src="/JS/profile.js" defer></script>
 </body>
 </html>
