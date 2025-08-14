@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8" />
+  <title>My Profile — CityGallery</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Your posts and stats." />
+  <link rel="stylesheet" href="/CSS/feed.css" />
+  <link rel="stylesheet" href="/CSS/profile.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="container nav">
+      <a class="brand" href="/landingPage.html">
+        <span class="logo" aria-hidden="true"></span>
+        <span class="brand-name">CityGallery</span>
+      </a>
+
+      <nav class="topnav" aria-label="Primary">
+        <a class="toplink" href="/feed" aria-current="page">Feed</a>
+        <a class="toplink" href="/settings">Settings</a>
+      </nav>
+
+      <div class="nav-actions">
+        <span id="userBadge" class="badge muted">Not signed in</span>
+        <button id="logoutBtn" class="btn">Log out</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Profile header -->
+  <section class="profile-hero">
+    <div class="container hero__row">
+      <div class="avatar xl" id="avatarHero" aria-hidden="true"></div>
+      <div class="hero__meta">
+        <h1 id="profileName">My Profile</h1>
+        <p class="muted" id="profileSubtitle">Your posts and stats</p>
+        <div class="hero__stats" id="heroStats" aria-live="polite"></div>
+      </div>
+      <div class="hero__actions">
+        <button id="newPostBtn" class="btn btn--primary">New Post</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Two-section layout -->
+  <main class="container profile-main">
+    <!-- With images -->
+    <section class="profile-section" id="sectionWith">
+      <div class="section-head">
+        <h2>Posts with images <span class="count" id="countWith">(0)</span></h2>
+      </div>
+      <ul id="gridWith" class="card-grid" aria-live="polite"></ul>
+      <div id="emptyWith" class="empty hidden">
+        <div class="empty__card">
+          <div class="empty__icon">🖼️</div>
+          <h3>No image posts</h3>
+          <p class="muted">Try removing filters or create a post with an image.</p>
+          <button class="btn btn--primary" id="emptyNewPost1">Create Post</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Without images -->
+    <section class="profile-section" id="sectionNo">
+      <div class="section-head">
+        <h2>Posts without images <span class="count" id="countNo">(0)</span></h2>
+      </div>
+      <ul id="gridNo" class="card-grid card-grid--noimg" aria-live="polite"></ul>
+      <div id="emptyNo" class="empty hidden">
+        <div class="empty__card">
+          <div class="empty__icon">🗂️</div>
+          <h3>No text-only posts</h3>
+          <p class="muted">Try removing filters or create a text-only post.</p>
+          <button class="btn btn--primary" id="emptyNewPost2">Create Post</button>
+        </div>
+      </div>
+    </section>
+  </main>
+  <!-- Create Post Modal -->
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal__card" role="document">
+      <div class="modal__header">
+        <h3 id="modalTitle">Create a new post</h3>
+        <button id="closeModal" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+
+      <form id="postForm" class="modal__body">
+        <fieldset class="fieldset">
+          <legend>Content</legend>
+          <label>Title
+            <input class="input" name="title" placeholder="A moment in the city" required />
+          </label>
+          <label>Content
+            <textarea class="input" name="content" rows="4" placeholder="Write a short caption…" required></textarea>
+          </label>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend>Media</legend>
+          <label>Image (local)
+            <input class="input" name="imageFile" type="file" accept="image/*" />
+          </label>
+          <div id="imagePreview" class="img-preview hidden" aria-live="polite"></div>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend>Options</legend>
+          <div class="grid2">
+            <label>Tags (comma separated)
+              <input class="input" name="tags" placeholder="street, sunset, food" />
+            </label>
+            <label>Location
+              <input class="input" name="location" placeholder="Tel Aviv, IL" />
+            </label>
+          </div>
+
+          <div class="grid2">
+            <label>Visibility
+              <select class="input" name="visibility" aria-label="Visibility">
+                <option value="public">Public</option>
+                <option value="friends">Friends</option>
+                <option value="private">Private</option>
+              </select>
+            </label>
+
+            <label class="chk">
+              <input type="checkbox" name="allowComments" checked />
+              <span>Allow comments</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="actions">
+          <button type="button" class="btn" id="clearForm">Clear</button>
+          <button type="button" class="btn" id="saveDraft">Save as Draft</button>
+          <button type="button" class="btn" id="cancelPost">Cancel</button>
+          <button type="submit" class="btn btn--primary">Publish</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- View modal (quick preview) -->
+  <div id="viewModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="viewTitle">
+    <div class="modal__card view-modal" role="document">
+      <div class="modal__header">
+        <h3 id="viewTitle">Post</h3>
+        <button id="closeView" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="modal__body" id="viewBody"></div>
+    </div>
+  </div>
+
+  <script src="/JS/profile.js"></script>
+</body>
+</html>
