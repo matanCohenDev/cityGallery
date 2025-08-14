@@ -54,7 +54,10 @@ exports.createPost = async (req, res, next) => {
     });
 
     // נוח לפרונט
-    await post.populate('author', 'username').populate('group', 'name');
+    await post.populate([
+      { path: 'author', select: 'username' },
+      { path: 'group', select: 'name' }
+    ])
 
     res.status(201).json(post);
   } catch (err) { next(err); }
