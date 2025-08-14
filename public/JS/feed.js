@@ -27,13 +27,17 @@ async function api(path, method = 'GET', body) {
 }
 
 // ===== header user state =====
+let currentUser = null;
+
 async function loadUser() {
   try {
     const me = await api('/api/users/me');
     $('#userBadge').textContent = `Signed in as ${me.username || me.user?.username || 'User'}`;
+    currentUser = me;
     return me;
   } catch {
     $('#userBadge').textContent = 'Not signed in';
+    currentUser = null;
     return null;
   }
 }
@@ -78,7 +82,6 @@ function buildParams() {
   if (q) params.set('q', q);
   if (imagesOnly) params.set('imagesOnly', 'true');
 
-  // קיבוץ — נשלח רק אם המשתמש בחר
   if (groupBy) {
     params.set('groupBy', groupBy);
     if (!Number.isNaN(itemsPerGroup) && itemsPerGroup > 0) {
@@ -122,7 +125,6 @@ function applyLocalFilters(items){
       if (ts < dayFromTs || ts > dayToTs) return false;
     }
 
-    // local search in title/content (case-insensitive)
     const q = $('#q')?.value.trim().toLowerCase() || '';
     if (q) {
       const hay = `${p.title ?? ''} ${p.content ?? ''}`.toLowerCase();
@@ -203,17 +205,11 @@ function makeGroupBlock(g, groupBy) {
   const wrap = document.createElement('li');
   wrap.className = 'group';
 
-  // key label
   let label = '';
-  if (groupBy === 'day') {
-    label = g.key; // 'YYYY-MM-DD'
-  } else if (groupBy === 'author') {
-    label = g.key?.username || '(Unknown)';
-  } else if (groupBy === 'group') {
-    label = g.key?.name || '(No group)';
-  } else {
-    label = String(g.key ?? '');
-  }
+  if (groupBy === 'day') label = g.key;
+  else if (groupBy === 'author') label = g.key?.username || '(Unknown)';
+  else if (groupBy === 'group') label = g.key?.name || '(No group)';
+  else label = String(g.key ?? '');
 
   wrap.innerHTML = `
     <div class="group__head">
@@ -235,7 +231,7 @@ function renderGroups(groups, groupBy, { append = false } = {}) {
   for (const g of groups) list.appendChild(makeGroupBlock(g, groupBy));
 }
 
-// ===== data load =====
+// ===== data load (feed) =====
 async function loadPosts({ append = false } = {}) {
   if (loading) return;
   loading = true;
@@ -245,9 +241,6 @@ async function loadPosts({ append = false } = {}) {
   try {
     const params = buildParams();
     const data = await api('/api/posts?' + params.toString());
-
-    // וורסיה רגילה (ללא groupBy): { items, total, page, pages }
-    // וורסיה מקובצת: { groupBy, groups, totalGroups, page, pages, ... }
     const groupBy = $('#groupBy')?.value || '';
 
     pages = (() => {
@@ -287,24 +280,21 @@ window.addEventListener('scroll', async () => {
   }
 });
 
-// ===== live filters (oninput/onchange) =====
-const requery = () => {
+// ===== live filters (feed) =====
+function requery() {
   const newKey = queryKey();
   if (newKey !== lastQueryKey) {
     lastQueryKey = newKey;
     page = 1;
     loadPosts();
   }
-};
+}
 
 $('#q')?.addEventListener('input', requery);
 $('#imagesOnly')?.addEventListener('change', requery);
 $('#day')?.addEventListener('change', requery);
 $('#groupBy')?.addEventListener('change', requery);
 $('#itemsPerGroup')?.addEventListener('change', requery);
-
-// empty-state new post
-$('#emptyNewPost')?.addEventListener('click', () => openModal());
 
 // ===== modal: create post =====
 const modal = $('#modal');
@@ -331,16 +321,16 @@ imageFileEl?.addEventListener('change', () => {
   previewBox.classList.remove('hidden');
 });
 
-// helper: upload image to server; expect {url} in response
+// upload helper
 async function uploadImage(file) {
   const fd = new FormData();
-  fd.append('image', file); // חשוב: השם 'image' תואם ל-upload.single('image')
+  fd.append('image', file);
   const res = await fetch('/api/uploads', { method: 'POST', body: fd, credentials: 'include' });
   if (!res.ok) {
     const txt = await res.text().catch(()=> '');
     throw new Error(`Upload failed (${res.status}): ${txt || res.statusText}`);
   }
-  return await res.json(); // { url: "/uploads/xxxx.jpg" }
+  return await res.json(); // { url }
 }
 
 function clearFormFields(form){
@@ -351,27 +341,6 @@ function clearFormFields(form){
 
 $('#clearForm')?.addEventListener('click', () => {
   const f = $('#postForm'); if (f) clearFormFields(f);
-});
-
-$('#saveDraft')?.addEventListener('click', async () => {
-  const f = $('#postForm'); if (!f) return;
-  const title   = f.title?.value?.trim() || '';
-  const content = f.content?.value?.trim() || '';
-  const tags         = f.tags?.value?.trim() || '';
-  const location     = f.location?.value?.trim() || '';
-  const visibility   = f.visibility?.value || 'public';
-  const allowComments= !!f.allowComments?.checked;
-
-  if (!title && !content) { alert('Nothing to save. Add a title or content.'); return; }
-
-  try {
-    const payload = { title, content, tags, location, visibility, allowComments, status: 'draft' };
-    await api('/api/posts', 'POST', payload);
-    alert('Draft saved');
-    clearFormFields(f);
-  } catch (e) {
-    alert('Save draft error: ' + e.message);
-  }
 });
 
 $('#postForm')?.addEventListener('submit', async (e) => {
@@ -392,7 +361,7 @@ $('#postForm')?.addEventListener('submit', async (e) => {
 
     const imgFile = f.imageFile?.files?.[0];
     if (imgFile) {
-      const { url } = await uploadImage(imgFile); // מחזיר { url }
+      const { url } = await uploadImage(imgFile);
       if (url) payload.images = [url];
     }
 
@@ -407,9 +376,108 @@ $('#postForm')?.addEventListener('submit', async (e) => {
   }
 });
 
+// ======= JOINABLE GROUPS SIDEBAR =======
+
+async function loadJoinableGroups() {
+  const box = $('#joinable');
+  const list = $('#joinableList');
+  if (!box || !list) return;
+
+  // אם לא מחובר — הסתר סיידבר
+  if (!currentUser) {
+    box.classList.add('hidden');
+    return;
+  }
+
+  box.classList.remove('hidden');
+  list.innerHTML = '';
+
+  // שלד טעינה
+  for (let i=0;i<3;i++){
+    const li = document.createElement('li');
+    li.className = 'jg-card skeleton';
+    li.innerHTML = `
+      <div class="jg-head">
+        <div class="jg-avatar skel"></div>
+        <div class="jg-meta">
+          <div class="line skel" style="width:70%"></div>
+          <div class="line skel" style="width:50%"></div>
+        </div>
+      </div>
+    `;
+    list.appendChild(li);
+  }
+
+  try {
+    const data = await api('/api/groups/joinable?limit=50', 'GET');
+    list.innerHTML = '';
+
+    if (!Array.isArray(data) || data.length === 0) {
+      list.innerHTML = `<li class="jg-empty muted">No available groups to join</li>`;
+      return;
+    }
+
+    for (const g of data) list.appendChild(makeJoinableCard(g));
+  } catch (e) {
+    list.innerHTML = `<li class="jg-error">Error loading groups: ${htmlEscape(e.message)}</li>`;
+  }
+}
+
+function initials(str='?') {
+  const p = String(str).trim().split(/\s+/).slice(0,2);
+  return p.map(s=>s[0]?.toUpperCase() || '').join('') || '?';
+}
+
+function makeJoinableCard(g){
+  const li = document.createElement('li');
+  li.className = 'jg-card';
+  const name = htmlEscape(g.name || 'Untitled');
+  const desc = htmlEscape(g.description || '');
+  const owner = g.owner?.username ? `by ${htmlEscape(g.owner.username)}` : '';
+  const membersCount = Array.isArray(g.members) ? g.members.length : (g.membersCount ?? 0);
+
+  li.innerHTML = `
+    <div class="jg-head">
+      <div class="jg-avatar" aria-hidden="true">${initials(g.name)}</div>
+      <div class="jg-meta">
+        <h4 class="jg-name" title="${name}">${name}</h4>
+        <div class="jg-sub muted">${owner}${owner && membersCount ? ' • ' : ''}${membersCount ? membersCount + ' members' : ''}</div>
+      </div>
+    </div>
+    ${desc ? `<p class="jg-desc">${desc}</p>` : ''}
+    <div class="jg-actions">
+      <button class="btn btn--primary jg-join" data-id="${g._id}">Join</button>
+    </div>
+  `;
+
+  li.querySelector('.jg-join')?.addEventListener('click', async (ev) => {
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    btn.textContent = 'Joining…';
+    try {
+      await api(`/api/groups/${encodeURIComponent(g._id)}/join`, 'POST');
+      // עדכון אופטימי: הסר את הכרטיס
+      li.remove();
+      // אם הרשימה התרוקנה – הצג הודעה
+      if (!$('#joinableList')?.children.length) {
+        $('#joinableList').innerHTML = `<li class="jg-empty muted">You're in all groups 🎉</li>`;
+      }
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = 'Join';
+      alert('Join error: ' + e.message);
+    }
+  });
+
+  return li;
+}
+
 // ===== init =====
 (async function init() {
   await loadUser();
   lastQueryKey = queryKey();
-  await loadPosts();
+  await Promise.all([
+    loadPosts(),
+    loadJoinableGroups(), // ← נטען סיידבר הקבוצות
+  ]);
 })();

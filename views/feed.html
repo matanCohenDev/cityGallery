@@ -16,7 +16,6 @@
         <span class="brand-name">CityGallery</span>
       </a>
 
-      <!-- New: top nav -->
       <nav class="topnav" aria-label="Primary">
         <a class="toplink" href="/profile">My Profile</a>
       </nav>
@@ -64,19 +63,30 @@
     </div>
   </section>
 
-  <!-- Feed -->
-  <main class="feed container">
-    <ul id="feedList" class="feed-list" aria-live="polite"></ul>
+  <!-- Feed + Joinable Sidebar -->
+  <section class="feed container">
+    <!-- MAIN FEED -->
+    <main aria-label="Feed">
+      <ul id="feedList" class="feed-list" aria-live="polite"></ul>
 
-    <div id="empty" class="empty hidden">
-      <div class="empty__card">
-        <div class="empty__icon">🌆</div>
-        <h3>No posts yet</h3>
-        <p class="muted">Try a different search, or create the very first post.</p>
-        <button class="btn btn--primary" id="emptyNewPost">Create Post</button>
+      <div id="empty" class="empty hidden">
+        <div class="empty__card">
+          <div class="empty__icon">🌆</div>
+          <h3>No posts yet</h3>
+          <p class="muted">Try a different search, or create the very first post.</p>
+          <button class="btn btn--primary" id="emptyNewPost">Create Post</button>
+        </div>
       </div>
-    </div>
-  </main>
+    </main>
+
+    <!-- JOINABLE SIDEBAR -->
+    <aside id="joinable" class="joinable hidden" aria-label="Groups you can join">
+      <div class="joinable__head">
+        <h3 class="joinable__title">Discover groups</h3>
+      </div>
+      <ul id="joinableList" class="joinable__list" aria-live="polite"></ul>
+    </aside>
+  </section>
 
   <!-- Create Post Modal -->
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">

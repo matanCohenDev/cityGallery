@@ -20,12 +20,59 @@ async function api(path, method='GET', body){
   return data;
 }
 
+function toImageUrl(u){
+  if(!u) return '';
+  if (/^https?:\/\//i.test(u) || u.startsWith('data:') || u.startsWith('blob:') || u.startsWith('/uploads/')) return u;
+  // נרמול מחרוזות כמו "uploads/abc.jpg"
+  u = String(u).replace(/^\.?\/?uploads[\\/]/i, '');
+  return `/uploads/${u}`;
+}
+
+function getGroupCoverRaw(g){
+  const candidate =
+    g?.coverImage ??
+    g?.cover ??
+    g?.avatar ??
+    g?.image ??
+    g?.photo ??
+    (typeof g?.cover === 'object' ? (g.cover.url || g.cover.src) : undefined) ??
+    (Array.isArray(g?.images) ? g.images[0] : undefined) ??
+    '';
+  if (candidate && typeof candidate === 'object') {
+    return candidate.url || candidate.src || '';
+  }
+  return candidate || '';
+}
+
+function getGroupCoverUrl(g){
+  const raw = getGroupCoverRaw(g);
+  return raw ? toImageUrl(raw) : '';
+}
+
+function initialsFromName(name='Group'){
+  const parts = String(name).trim().split(/\s+/).slice(0,2);
+  return parts.map(p => p[0]?.toUpperCase() || '').join('') || 'GR';
+}
+
+function avatarFallbackHtml(name){
+  const ini = initialsFromName(name);
+  return `<div class="avatar-fallback" aria-hidden="true">${ini}</div>`;
+}
+
 /* ---------- Toast ---------- */
 const toastEl = $('#toast');
 function showToast(msg, type='ok'){
   if (!toastEl) return; toastEl.textContent=msg;
   toastEl.classList.remove('hidden','ok','error'); toastEl.classList.add(type);
   setTimeout(()=> toastEl.classList.add('hidden'), 2200);
+}
+
+async function deleteGroupById(groupId){
+  const ok = confirm('Delete this group? This action cannot be undone.');
+  if (!ok) return false;
+  await api(`/api/groups/${encodeURIComponent(groupId)}`, 'DELETE');
+  showToast('Group deleted ✔','ok');
+  return true;
 }
 
 /* ---------- User header ---------- */
@@ -83,7 +130,7 @@ function skeletonGrid(targetUl, n=6){
 function cardTemplate(p){
   const title = htmlEscape(p.title || '');
   const when  = p.createdAt ? fmtExact(p.createdAt) : '';
-  const img   = hasImage(p) ? p.images[0] : null;
+  const img   = hasImage(p) ? toImageUrl(p.images[0]) : null;
 
   const li = document.createElement('li');
   li.className = 'card' + (img ? '' : ' card--noimg');
@@ -109,9 +156,7 @@ function cardTemplate(p){
   li.querySelector('[data-action="edit"]')?.addEventListener('click', (e)=>{ e.preventDefault(); openEdit(p); });
   li.querySelector('[data-action="delete"]')?.addEventListener('click', async (e)=>{
     e.preventDefault();
-    console.log('Deleting post:', p._id || p.id);
     try{
-      console.log('Deleting post:', p._id || p.id);
       await api(`/api/posts/${p._id || p.id}`, 'DELETE');
       showToast('Post deleted ✔','ok');
       page=1; pages=1; cache=[]; mine=[]; await loadMine();
@@ -142,7 +187,7 @@ viewModal?.addEventListener('click', (e)=>{ if(e.target===viewModal) closeView()
 document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && !viewModal?.classList.contains('hidden')) closeView() });
 function openPreview(p){
   $('#viewTitle')?.replaceChildren(document.createTextNode(p.title || 'Post'));
-  const img = hasImage(p) ? `<img class="view-cover" src="${p.images[0]}" alt="">` : '';
+  const img = hasImage(p) ? `<img class="view-cover" src="${toImageUrl(p.images[0])}" alt="">` : '';
   if(viewBody){ viewBody.innerHTML = `${img}<div><div class="muted" style="margin-bottom:6px">${fmtExact(p.createdAt||Date.now())}</div><h3 style="margin:.2em 0">${htmlEscape(p.title||'(No title)')}</h3><p style="margin:.4em 0; white-space:pre-wrap">${htmlEscape(p.content||'')}</p></div>`}
   openView();
 }
@@ -215,7 +260,7 @@ $('#postForm')?.addEventListener('submit', async (e)=>{
   }catch(err){ showToast('Create post error: '+err.message,'error') }
 });
 
-/* ---------- Settings (unchanged core) ---------- */
+/* ---------- Settings ---------- */
 const settingsModal=$('#settingsModal'), settingsForm=$('#settingsForm');
 $('#openSettings')?.addEventListener('click',(e)=>{ e.preventDefault(); openSettings() });
 $('#closeSettings')?.addEventListener('click', closeSettings);
@@ -259,7 +304,7 @@ let EDIT_POST_ID=null;
 function openEdit(p){
   EDIT_POST_ID = p._id || p.id;
   $('#editTitle')?.replaceChildren(document.createTextNode(`Edit: ${p.title || 'Post'}`));
-  editPreviewBox.innerHTML = hasImage(p) ? `<img class="view-cover" src="${p.images[0]}" alt="">` : `<div class="muted">No image</div>`;
+  editPreviewBox.innerHTML = hasImage(p) ? `<img class="view-cover" src="${toImageUrl(p.images[0])}" alt="">` : `<div class="muted">No image</div>`;
   editForm.title.value = p.title || ''; editForm.content.value = p.content || ''; editForm.removeImage.checked=false;
   if(editImagePreview){ editImagePreview.classList.add('hidden'); editImagePreview.innerHTML='' }
   if(editImageInput) editImageInput.value='';
@@ -284,65 +329,102 @@ editForm?.addEventListener('submit', async (e)=>{
 
 /* ---------- Groups: list + create ---------- */
 const gridAdminGroups = $('#gridAdminGroups');
-const gridMemberGroups= $('#gridMemberGroups');
-function groupCardTemplate(g){
+// חשוב: ב-HTML אין אלמנט עם id="gridMemberGroups", לכן נשתמש ב-#gridMyGroups
+const gridMemberGroups= $('#gridMyGroups');
+
+function groupCardTemplate(g, { isOwner = false } = {}){
   const id    = g._id || g.id;
   const name  = g.name || 'Group';
   const desc  = g.description || '';
-  const cover = g.coverImage || '';
-  const isPublic = !!g.isPublic;
+  const isPublic = g.isPublic === true;
   const members = (g.membersCount ?? (Array.isArray(g.members) ? g.members.length : undefined) ?? 1);
 
-  const li = document.createElement('li');
-  li.className = 'group-mini';
-  li.innerHTML = `
-    <a class="group-mini__avatar" href="/group.html?id=${id}" aria-label="${htmlEscape(name)}">
-      ${cover ? `<img src="${cover}" alt="">` : ''}
-    </a>
+  const coverUrl = getGroupCoverUrl(g);
 
-    <div class="group-mini__body">
-      <h4 class="group-mini__name">${htmlEscape(name)}</h4>
-      <div class="group-mini__meta">
-        <span>${isPublic ? 'Public' : 'Private'}</span>
-        <span>•</span>
-        <span>${members} members</span>
+  const li = document.createElement('li');
+  li.className = 'group-card';
+  li.innerHTML = `
+    <div class="group-card__head">
+      <a class="group-card__avatar" aria-label="${htmlEscape(name)}">
+        ${
+          coverUrl
+            ? `<img src="${coverUrl}" alt="${htmlEscape(name)}"
+                  loading="lazy"
+                  onerror="this.closest('.group-card__avatar').innerHTML=\`${avatarFallbackHtml(htmlEscape(name)).replace(/`/g,'\\`')}\`;"/>`
+            : `${avatarFallbackHtml(name)}`
+        }
+      </a>
+      <h4 class="group-card__name" title="${htmlEscape(name)}">${htmlEscape(name)}</h4>
+    </div>
+
+    <p class="group-card__desc">${htmlEscape(desc)}</p>
+
+    <div class="group-card__foot">
+      <div style="display:flex; gap:8px">
+        <button class="btn" data-action="members" data-id="${id}" data-name="${htmlEscape(name)}">Members</button>
+        ${isOwner ? `<button class="btn btn-danger" data-action="delete">Delete</button>` : ''}
       </div>
     </div>
-
-    <div class="group-mini__actions">
-      <a class="btn" href="/group.html?id=${id}">Open</a>
-    </div>
   `;
+
+  // ✅ מאזין הכפתור בתוך הסקופ הנכון (ללא ReferenceError)
+  li.querySelector('[data-action="members"]')?.addEventListener('click', (e)=>{
+    e.preventDefault();
+    openMembersModal(id, name);
+  });
+
+   if (isOwner) {
+   li.querySelector('[data-action="delete"]')?.addEventListener('click', async (e)=>{
+     e.preventDefault();
+    try{
+       const ok = await deleteGroupById(id);
+       if (ok) {
+        // הסר את הכרטיס מה־DOM
+         li.remove();
+       }
+    }catch(err){
+       showToast(err.message || 'Failed to delete group','error');
+     }
+   });
+ }
+
   return li;
 }
 
+function renderMyGroups(groups){
+  const ul = document.getElementById('gridMyGroups');
+  if(!ul) return;
+  ul.innerHTML = '';
+  groups.forEach(g => ul.appendChild(groupCardTemplate(g)));
+}
+
 function renderGroupLists(adminGroups, memberGroups){
-  gridAdminGroups.innerHTML=''; gridMemberGroups.innerHTML='';
-  adminGroups.forEach(g=> gridAdminGroups.appendChild(groupCardTemplate(g)));
-  memberGroups.forEach(g=> gridMemberGroups.appendChild(groupCardTemplate(g)));
+  gridAdminGroups?.replaceChildren();
+  gridMemberGroups?.replaceChildren();
+  adminGroups.forEach(g=> gridAdminGroups?.appendChild(groupCardTemplate(g, { isOwner:true })));
+  memberGroups.forEach(g=> gridMemberGroups?.appendChild(groupCardTemplate(g, { isOwner:false })));
+  // הגנות: אלמנטים מונים/ריקים אולי לא קיימים ב-HTML הנוכחי
   $('#countAdminGroups')?.replaceChildren(document.createTextNode(`(${adminGroups.length})`));
   $('#countMemberGroups')?.replaceChildren(document.createTextNode(`(${memberGroups.length})`));
   $('#emptyAdminGroups')?.classList.toggle('hidden', adminGroups.length!==0);
   $('#emptyMemberGroups')?.classList.toggle('hidden', memberGroups.length!==0);
 }
+
 async function loadGroups(){
-  // ננסה כמה נתיבים מקובלים כדי לא לשבור — ה-API שלך אולי קצת שונה
   try{
-    // ניסיון 1: /api/groups?mine=1
     const data = await api('/api/groups?mine=1');
-    const a = Array.isArray(data.admin) ? data.admin : (data.adminGroups || data.admins || []);
-    const m = Array.isArray(data.member)? data.member: (data.memberGroups|| data.members || []);
-    if (a.length || m.length){ return renderGroupLists(a,m) }
-    // אם חזר מערך יחיד — נפריד לפי role
+    const a = Array.isArray(data?.admin) ? data.admin : (data?.adminGroups || data?.admins || []);
+    const m = Array.isArray(data?.member)? data.member: (data?.memberGroups|| data?.members || []);
+    if ((a && a.length) || (m && m.length)){ return renderGroupLists(a||[],m||[]) }
     if (Array.isArray(data)){
       const admin = data.filter(g=> g.role==='admin' || g.isOwner || g.createdBy === (CURRENT_USER?._id || CURRENT_USER?.id));
       const member= data.filter(g=> !(admin.includes(g)));
+      renderMyGroups(Array.isArray(data) ? data : (data.items || []));
       return renderGroupLists(admin, member);
     }
   }catch{}
 
   try{
-    // ניסיון 2: /api/groups/mine
     const data2 = await api('/api/groups/mine');
     const admin = data2.admin || data2.adminGroups || [];
     const member= data2.member|| data2.memberGroups|| [];
@@ -350,7 +432,6 @@ async function loadGroups(){
   }catch{}
 
   try{
-    // ניסיון 3: /api/groups?member=me
     const data3 = await api('/api/groups?member=me');
     const admin = Array.isArray(data3) ? data3.filter(g=> g.role==='admin' || g.isOwner) : (data3.admin || []);
     const member= Array.isArray(data3) ? data3.filter(g=> !(g.role==='admin'||g.isOwner)) : (data3.member||[]);
@@ -363,8 +444,17 @@ async function loadGroups(){
 }
 
 /* Create Group modal */
-const groupModal=$('#groupModal'), groupForm=$('#groupForm'); const openCreateGroup=$('#openCreateGroup'); const openCreateGroup2=$('#openCreateGroup2'); const closeGroupBtn=$('#closeGroup'); const cancelGroupBtn=$('#cancelGroup'); const groupCoverInput=groupForm?.coverFile; const groupCoverPreview=$('#groupCoverPreview');
-function openGroupModal(){ groupForm.reset(); if(groupCoverPreview){ groupCoverPreview.classList.add('hidden'); groupCoverPreview.innerHTML='' } groupModal?.classList.remove('hidden'); lockScroll(true) }
+const groupModal=$('#groupModal'), groupForm=$('#groupForm');
+const openCreateGroup=$('#openCreateGroup'), openCreateGroup2=$('#openCreateGroup2');
+const closeGroupBtn=$('#closeGroup'), cancelGroupBtn=$('#cancelGroup');
+const groupCoverInput=groupForm?.coverFile;
+const groupCoverPreview=$('#groupCoverPreview');
+
+function openGroupModal(){
+  groupForm?.reset();
+  if(groupCoverPreview){ groupCoverPreview.classList.add('hidden'); groupCoverPreview.innerHTML='' }
+  groupModal?.classList.remove('hidden'); lockScroll(true)
+}
 function closeGroupModal(){ groupModal?.classList.add('hidden'); lockScroll(false) }
 openCreateGroup?.addEventListener('click', openGroupModal);
 openCreateGroup2?.addEventListener('click', openGroupModal);
@@ -385,7 +475,6 @@ groupCoverInput?.addEventListener('change', async ()=>{
     return;
   }
 
-  // הצגה מיידית מקומית כדי שלא נחכה לרשת
   const localUrl = URL.createObjectURL(f);
   if(groupCoverPreview){
     groupCoverPreview.innerHTML = `
@@ -396,14 +485,12 @@ groupCoverInput?.addEventListener('change', async ()=>{
     groupCoverPreview.classList.remove('hidden');
   }
 
-  // העלאה אמיתית לשרת
   try{
-    const { url } = await uploadImage(f);   // יש לך uploadImage שמעלה ל-/api/uploads
+    const { url } = await uploadImage(f);
     LAST_UPLOADED_GROUP_COVER_URL = url || null;
 
-    // מעדכנים את הפריוויו ל-URL האמיתי מהשרת
     if(url && groupCoverPreview){
-      groupCoverPreview.querySelector('img').src = url;
+      groupCoverPreview.querySelector('img').src = toImageUrl(url);
       const st = groupCoverPreview.querySelector('#groupCoverStatus');
       if(st) st.textContent = 'Uploaded ✓';
     }
@@ -414,10 +501,9 @@ groupCoverInput?.addEventListener('change', async ()=>{
   }
 });
 
-
 async function uploadGroupCoverIfAny(){
   const f=groupCoverInput?.files?.[0]; if(!f) return null;
-  const { url } = await uploadImage(f); // משתמש באותו upload /api/uploads
+  const { url } = await uploadImage(f);
   return url || null;
 }
 
@@ -425,19 +511,13 @@ groupForm?.addEventListener('submit', async (e)=>{
   e.preventDefault();
   const name = groupForm.name.value.trim();
   const description = groupForm.description.value.trim();
-  const visibility = groupForm.visibility.value;
+  const visibility = groupForm.visibility?.value || 'public'; // ✅ מונע קריסה כשאין שדה
 
   if(!name || !description) return showToast('Name & description are required','error');
 
   try{
-    const payload = {
-      name,
-      description,
-      isPublic: visibility === 'public'
-    };
-    if (LAST_UPLOADED_GROUP_COVER_URL) {
-      payload.coverImage = LAST_UPLOADED_GROUP_COVER_URL;
-    }
+    const payload = { name, description, isPublic: visibility === 'public' };
+    if (LAST_UPLOADED_GROUP_COVER_URL) payload.coverImage = LAST_UPLOADED_GROUP_COVER_URL;
 
     const endpoints = [
       { url:'/api/groups', method:'POST', body:payload },
@@ -452,7 +532,6 @@ groupForm?.addEventListener('submit', async (e)=>{
     if(!ok) throw new Error('Group create endpoint not found');
 
     showToast('Group created ✔','ok');
-    // איפוס משתנה העזר לפרויקט הבא
     LAST_UPLOADED_GROUP_COVER_URL = null;
     closeGroupModal();
     await loadGroups();
@@ -461,6 +540,157 @@ groupForm?.addEventListener('submit', async (e)=>{
   }
 });
 
+// ===== Members Modal Logic =====
+const membersModal   = $('#membersModal');
+const closeMembersBtn= $('#closeMembers');
+const membersListEl  = $('#membersList');
+const membersEmptyEl = $('#membersEmpty');
+const membersSearch  = $('#membersSearch');
+const membersCountEl = $('#membersCount');
+
+let MEMBERS_GROUP_ID   = null;
+let MEMBERS_GROUP_NAME = '';
+let MEMBERS_CAN_REMOVE = false;
+let MEMBERS_DATA       = [];
+let MEMBERS_FILTERED   = [];
+
+function openMembersModal(groupId, groupName){
+  MEMBERS_GROUP_ID = groupId;
+  MEMBERS_GROUP_NAME = groupName || 'Group';
+  $('#membersTitle')?.replaceChildren(document.createTextNode(`Members • ${groupName || 'Group'}`));
+  membersModal?.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  loadMembers();
+}
+
+function closeMembersModal(){
+  membersModal?.classList.add('hidden');
+  document.body.style.overflow = '';
+  MEMBERS_GROUP_ID = null;
+  MEMBERS_DATA = [];
+  MEMBERS_FILTERED = [];
+  MEMBERS_CAN_REMOVE = false;
+  if (membersListEl) membersListEl.innerHTML = '';
+}
+
+closeMembersBtn?.addEventListener('click', closeMembersModal);
+membersModal?.addEventListener('click', (e)=>{ if(e.target === membersModal) closeMembersModal(); });
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && !membersModal?.classList.contains('hidden')) closeMembersModal(); });
+
+async function loadMembers(){
+  if (!MEMBERS_GROUP_ID) return;
+  if (membersListEl){
+    membersListEl.innerHTML = '';
+    for (let i=0;i<3;i++){
+      const li=document.createElement('li');
+      li.className='member-row skeleton';
+      li.innerHTML = `<div class="member-main">
+        <div class="member-avatar skel"></div>
+        <div class="member-meta" style="flex:1">
+          <div class="line skel" style="width:60%"></div>
+          <div class="line skel" style="width:40%"></div>
+        </div>
+      </div>`;
+      membersListEl.appendChild(li);
+    }
+  }
+
+  try{
+    const res = await api(`/api/groups/${encodeURIComponent(MEMBERS_GROUP_ID)}/members`, 'GET');
+    MEMBERS_CAN_REMOVE = !!res.canRemove;
+    MEMBERS_DATA = Array.isArray(res.members) ? res.members : [];
+    applyMembersFilter();
+  }catch(err){
+    if (membersListEl) membersListEl.innerHTML = `<li class="member-row"><div class="member-main"><div class="member-meta"><div class="member-name">Error</div><div class="member-sub">${htmlEscape(err.message)}</div></div></div></li>`;
+    MEMBERS_CAN_REMOVE = false;
+    MEMBERS_DATA = [];
+    applyMembersFilter();
+  }
+}
+
+function applyMembersFilter(){
+  const q = (membersSearch?.value || '').trim().toLowerCase();
+  MEMBERS_FILTERED = MEMBERS_DATA.filter(m => {
+    const hay = `${m.username || ''} ${m.email || ''}`.toLowerCase();
+    return !q || hay.includes(q);
+  });
+  renderMembersList();
+}
+
+membersSearch?.addEventListener('input', applyMembersFilter);
+
+function renderMembersList(){
+  if (!membersListEl) return;
+  membersListEl.innerHTML = '';
+
+  if (!MEMBERS_FILTERED.length){
+    membersEmptyEl?.classList.remove('hidden');
+  } else {
+    membersEmptyEl?.classList.add('hidden');
+  }
+
+  membersCountEl?.replaceChildren(document.createTextNode(`(${MEMBERS_DATA.length})`));
+
+  for (const m of MEMBERS_FILTERED){
+    const li = document.createElement('li');
+    li.className = 'member-row';
+    const uname = htmlEscape(m.username || 'User');
+    const email = htmlEscape(m.email || '');
+
+    li.innerHTML = `
+      <div class="member-main">
+        <div class="member-avatar">${(uname[0]||'U').toUpperCase()}</div>
+        <div class="member-meta">
+          <div class="member-name">${uname}</div>
+          <div class="member-sub">${email}</div>
+        </div>
+      </div>
+      <div class="member-actions">
+        ${MEMBERS_CAN_REMOVE ? `<button class="btn btn-danger" data-remove="${m._id}">Remove</button>` : ''}
+      </div>
+    `;
+
+    if (MEMBERS_CAN_REMOVE){
+      const btn = li.querySelector('[data-remove]');
+      btn?.addEventListener('click', async (e)=>{
+        e.preventDefault();
+
+        const userId = e.currentTarget.dataset.remove || e.currentTarget.getAttribute('data-remove');
+        if (!userId) { showToast('No user id','error'); return; }
+
+        const ok = confirm(`Remove ${m.username || 'this member'} from "${MEMBERS_GROUP_NAME}"?`);
+        if (!ok) return;
+
+        try{
+          // נטרל לחיצה כפולה
+          btn.disabled = true;
+
+          const url = `/api/groups/${encodeURIComponent(MEMBERS_GROUP_ID)}/members/${encodeURIComponent(userId)}`;
+          await api(url, 'DELETE');
+
+          // הסרה מקומית
+          MEMBERS_DATA = MEMBERS_DATA.filter(x => String(x._id) !== String(userId));
+          applyMembersFilter();
+
+          // עדכון מונה בכרטיס קבוצה (אם קיים בעמוד)
+          const pill = document.querySelector(`[data-members-count="${MEMBERS_GROUP_ID}"]`);
+          if (pill){
+            pill.textContent = `${MEMBERS_DATA.length} members`;
+          }
+
+          showToast('Member removed ✔','ok');
+        }catch(err){
+          showToast(err.message || 'Failed to remove member','error');
+        }finally{
+          btn.disabled = false;
+        }
+      });
+    }
+
+
+    membersListEl.appendChild(li);
+  }
+}
 
 /* ---------- Init ---------- */
 async function init(){

@@ -69,7 +69,6 @@
       <div class="section-head">
         <h2>My Groups</h2>
         <div style="display:flex;gap:8px;align-items:center">
-          <button id="refreshGroups" class="btn">Refresh</button>
           <button id="openCreateGroup2" class="btn btn--primary">Create Group</button>
         </div>
       </div>
@@ -80,7 +79,8 @@
       </div>
 
       <div class="profile-section">
-        <ul id="gridMemberGroups" class="groups-grid" aria-live="polite"></ul>
+      <!-- גריד קבוצות: 4 בשורה -->
+      <ul id="gridMyGroups" class="groups-grid4" aria-live="polite"></ul>
         <div id="emptyMemberGroups" class="empty hidden">
           <div class="empty__card">
             <div class="empty__icon">👥</div>
@@ -262,12 +262,6 @@
             <label>Name
               <input class="input" name="name" placeholder="Tel-Aviv Photography" required />
             </label>
-            <label>Visibility
-              <select class="input" name="visibility">
-                <option value="public" selected>Public (anyone can view & join)</option>
-                <option value="private">Private (invite / approval)</option>
-              </select>
-            </label>
           </div>
           <label>Description
             <textarea class="input" name="description" rows="3" placeholder="What is this group about?" required></textarea>
@@ -276,10 +270,6 @@
         </fieldset>
 
         <fieldset class="fieldset">
-          <legend>Cover</legend>
-          <label>Cover image
-            <input class="input" name="coverFile" type="file" accept="image/*" />
-          </label>
           <div id="groupCoverPreview" class="img-preview hidden" aria-live="polite"></div>
         </fieldset>
 
@@ -293,6 +283,29 @@
 
   <!-- Toast -->
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+<!-- Members Modal (NEW) -->
+  <div id="membersModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="membersTitle">
+    <div class="modal__card" role="document">
+      <div class="modal__header">
+        <h3 id="membersTitle">Group Members</h3>
+        <button id="closeMembers" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="modal__body">
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="membersSearch" class="input" placeholder="Search members…" />
+          <span class="muted" id="membersCount">(0)</span>
+        </div>
+        <ul id="membersList" class="members-list" aria-live="polite"></ul>
+        <div id="membersEmpty" class="empty hidden">
+          <div class="empty__card">
+            <div class="empty__icon">👥</div>
+            <h3>No members</h3>
+            <p class="muted">This group has no members yet.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="/JS/profile.js" defer></script>
 </body>
