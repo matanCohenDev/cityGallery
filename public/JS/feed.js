@@ -327,12 +327,15 @@ $('#clearForm')?.addEventListener('click', () => {
 $('#saveDraft')?.addEventListener('click', async () => {
   const f = $('#postForm');
   if (!f) return;
-  const title = f.title.value.trim();
-  const content = f.content.value.trim();
-  const tags = f.tags.value.trim();
-  const location = f.location.value.trim();
-  const visibility = f.visibility.value || 'public';
-  const allowComments = !!f.allowComments.checked;
+
+  const title        = f.title?.value?.trim() || '';
+  const content      = f.content?.value?.trim() || '';
+
+  // השדות הבאים לא קיימים בטופס – לכן חובה עם ?.
+  const tags         = f.tags?.value?.trim() || '';
+  const location     = f.location?.value?.trim() || '';
+  const visibility   = f.visibility?.value || 'public';
+  const allowComments= !!f.allowComments?.checked;
 
   if (!title && !content) {
     alert('Nothing to save. Add a title or content.');
@@ -349,28 +352,31 @@ $('#saveDraft')?.addEventListener('click', async () => {
   }
 });
 
+
 $('#postForm')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
 
-  const title = f.title.value.trim();
-  const content = f.content.value.trim();
-  const tags = f.tags.value.trim();
-  const location = f.location.value.trim();
-  const visibility = f.visibility.value || 'public';
-  const allowComments = !!f.allowComments.checked;
+  const title        = f.title?.value?.trim() || '';
+  const content      = f.content?.value?.trim() || '';
 
-  if (!title || !content) { 
-    alert('Please fill title and content'); 
-    return; 
+  // לא קיימים בטופס? אין בעיה, ברירת מחדל תופסת
+  const tags         = f.tags?.value?.trim() || '';
+  const location     = f.location?.value?.trim() || '';
+  const visibility   = f.visibility?.value || 'public';
+  const allowComments= !!f.allowComments?.checked;
+
+  if (!title || !content) {
+    alert('Please fill title and content');
+    return;
   }
 
   try {
     const payload = { title, content, tags, location, visibility, allowComments, status: 'published' };
 
-    const imgFile = f.imageFile.files?.[0];
+    const imgFile = f.imageFile?.files?.[0];
     if (imgFile) {
-      const { url } = await uploadImage(imgFile);
+      const { url } = await uploadImage(imgFile); // מחזיר { url }
       if (url) payload.images = [url];
     }
 
@@ -384,6 +390,7 @@ $('#postForm')?.addEventListener('submit', async (e) => {
     alert('Create post error: ' + e.message);
   }
 });
+
 
 // ===== init =====
 (async function init() {
