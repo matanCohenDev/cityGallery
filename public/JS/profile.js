@@ -68,8 +68,6 @@ function showToast(msg, type='ok'){
 }
 
 async function deleteGroupById(groupId){
-  const ok = confirm('Delete this group? This action cannot be undone.');
-  if (!ok) return false;
   await api(`/api/groups/${encodeURIComponent(groupId)}`, 'DELETE');
   showToast('Group deleted ✔','ok');
   return true;
