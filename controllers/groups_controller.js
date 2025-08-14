@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 const OID = (v) => new mongoose.Types.ObjectId(v);
 const Group = require('../models/groups_model');
 const User  = require('../models/users_model');
+const { postTweet } = require('../utils/tweet');
 
-// POST /api/groups
 exports.createGroup = async (req, res, next) => {
   try {
     if (!req.session?.userId) return res.status(401).json({ msg: 'Unauthorized' });
@@ -11,6 +11,7 @@ exports.createGroup = async (req, res, next) => {
     if (!name) return res.status(400).json({ msg: 'Missing group name' });
 
     const uid = OID(req.session.userId);
+
     const g = await Group.create({
       name,
       description,
@@ -19,6 +20,24 @@ exports.createGroup = async (req, res, next) => {
     });
 
     await User.findByIdAndUpdate(uid, { $addToSet: { groups: g._id } });
+
+    // ציוץ (best-effort; לא מפיל את הבקשה אם נכשל)
+    try {
+      const tweetText = `New group just opened: "${name}" — join the community on CityGallery!`;
+      const result = await postTweet(tweetText);
+      if (result?.id) {
+        g.tweetId = result.id;
+        g.tweetUrl = result.url;
+        g.tweetedAt = new Date();
+        await g.save();
+        console.log('[group] tweeted ✔', result.url);
+      } else {
+        console.warn('[group] tweet skipped/failed: twitter disabled or not configured');
+      }
+    } catch (twErr) {
+      console.warn('[group] tweet error:', twErr?.message || twErr);
+    }
+
     res.status(201).json(g);
   } catch (err) { next(err); }
 };

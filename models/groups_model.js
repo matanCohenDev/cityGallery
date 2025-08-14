@@ -5,6 +5,10 @@ const groupSchema = new mongoose.Schema({
   description: { type: String, trim: true, maxlength: 500 },
   owner:       { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   members:     [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  tweetId:   { type: String },
+  tweetUrl:  { type: String },
+  tweetedAt: { type: Date },
+
 }, { timestamps: true });
 
 module.exports = mongoose.model('Group', groupSchema);

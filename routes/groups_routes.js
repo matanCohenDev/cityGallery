@@ -27,4 +27,14 @@ router.post('/:id/leave',    requireAuth, leaveGroup);
 router.patch('/:id',         requireAuth, updateGroup);
 router.delete('/:id',        requireAuth, deleteGroup);
 
+// routes/groups_routes.js
+router.get('/:id/tweet', async (req, res, next) => {
+  try {
+    const g = await Group.findById(req.params.id).lean();
+    if (!g) return res.status(404).json({ msg: 'Not found' });
+    res.json({ tweetId: g.tweetId || null, tweetUrl: g.tweetUrl || null, tweetedAt: g.tweetedAt || null });
+  } catch (e) { next(e); }
+});
+
+
 module.exports = router;
