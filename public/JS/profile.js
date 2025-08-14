@@ -152,7 +152,7 @@ function cardTemplate(p){
   });
   li.querySelector('[data-action="edit"]')?.addEventListener('click', (e) => {
     e.preventDefault();
-    alert('Hook your editor route here, e.g. /pages/editor.html?id=' + (p._id || p.id));
+    openEdit(p);
   });
 
   return li;
@@ -584,3 +584,110 @@ if (document.readyState === 'loading'){
 } else {
   init();
 }
+
+
+// ===================== EDIT MODAL =====================
+const editModal  = $('#editModal');
+const editForm   = $('#editForm');
+const closeEditBtn = $('#closeEdit');
+const cancelEditBtn= $('#cancelEdit');
+const editPreviewBox = $('#editPreviewBox');
+const editImageInput = editForm?.querySelector('input[name="imageFile"]');
+const editImagePreview = $('#editImagePreview');
+
+let EDIT_POST_ID = null;
+let EDIT_POST_ORIG = null;
+
+function openEdit(p){
+  EDIT_POST_ID = p._id || p.id;
+  EDIT_POST_ORIG = p;
+
+  // כותרת
+  $('#editTitle')?.replaceChildren(document.createTextNode(`Edit: ${p.title || 'Post'}`));
+
+  // תמונת כיסוי (preview current)
+  const hasImg = hasImage(p);
+  editPreviewBox.innerHTML = hasImg
+    ? `<img class="view-cover" src="${p.images[0]}" alt="">`
+    : `<div class="muted">No image</div>`;
+
+  // מילוי שדות
+  editForm.title.value = p.title || '';
+  editForm.content.value = p.content || '';
+  editForm.removeImage.checked = false;
+
+  // ניקוי תצוגת "תמונה חדשה"
+  if (editImagePreview){
+    editImagePreview.classList.add('hidden');
+    editImagePreview.innerHTML = '';
+  }
+  if (editImageInput) editImageInput.value = '';
+
+  editModal?.classList.remove('hidden');
+  lockScroll(true);
+}
+
+function closeEdit(){
+  editModal?.classList.add('hidden');
+  lockScroll(false);
+  EDIT_POST_ID = null;
+  EDIT_POST_ORIG = null;
+}
+
+closeEditBtn?.addEventListener('click', closeEdit);
+cancelEditBtn?.addEventListener('click', closeEdit);
+editModal?.addEventListener('click', (e)=>{ if (e.target === editModal) closeEdit(); });
+document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && !editModal?.classList.contains('hidden')) closeEdit(); });
+
+// תצוגת קובץ חדש שנבחר
+editImageInput?.addEventListener('change', () => {
+  const f = editImageInput.files?.[0];
+  if (!f) { editImagePreview?.classList.add('hidden'); if(editImagePreview) editImagePreview.innerHTML=''; return; }
+  const url = URL.createObjectURL(f);
+  if (editImagePreview){
+    editImagePreview.innerHTML = `<img src="${url}" alt="preview"><small class="muted">${f.name} • ${(f.size/1024).toFixed(1)} KB</small>`;
+    editImagePreview.classList.remove('hidden');
+  }
+});
+
+// שמירת עריכה
+editForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!EDIT_POST_ID) return showToast('No post selected', 'error');
+
+  const title   = editForm.title.value.trim();
+  const content = editForm.content.value.trim();
+  const removeImage = !!editForm.removeImage.checked;
+
+  if (!title || !content){
+    return showToast('Title and text are required', 'error');
+  }
+
+  try{
+    const payload = { title, content };
+
+    // טיפול בתמונה:
+    // 1) אם ביקש להסיר — נשלח images: []
+    // 2) אם בחר קובץ חדש — נעלה ונשלח images:[newUrl]
+    // 3) אחרת — להשאיר כמו שהיה (אל תשלח images)
+    const newFile = editImageInput?.files?.[0];
+
+    if (removeImage) {
+      payload.images = [];
+    } else if (newFile) {
+      const { url } = await uploadImage(newFile);
+      if (url) payload.images = [url];
+    }
+
+    await api(`/api/posts/${EDIT_POST_ID}`, 'PATCH', payload);
+
+    // סגירה ורענון
+    closeEdit();
+    page = 1; pages = 1; cache = []; mine = [];
+    await loadMine();
+    showToast('Post updated ✔', 'ok');
+  }catch(err){
+    console.error(err);
+    showToast(err.message || 'Failed to update post', 'error');
+  }
+});

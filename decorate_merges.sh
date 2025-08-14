@@ -29,7 +29,7 @@ while IFS= read -r author; do
   # קומיט ריק כדי ליצור בליטה בגרף; משייך את המחבר מה-authors.txt
   GIT_COMMITTER_NAME="${name}" \
   GIT_COMMITTER_EMAIL="${author#*<}"; GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL%>}"
-  git commit --allow-empty --author="$author" -m "changes"
+  git commit --allow-empty --author="$author" -m "edit posts"
 
   # דחיפת הענף
   git push -u origin "$branch"

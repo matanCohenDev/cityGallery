@@ -32,17 +32,33 @@
   <!-- Toolbar -->
   <section class="toolbar">
     <div class="container toolbar__row">
-      <div class="input-wrap" role="search">
-        <input id="q" class="input" placeholder="Search posts…" aria-label="Search posts" />
+      <div class="toolbar__left">
+        <div class="input-wrap" role="search">
+          <input id="q" class="input" placeholder="Search posts…" aria-label="Search posts" />
+        </div>
+
+        <div class="filters" role="region" aria-label="Filters">
+          <label class="chk">
+            <input type="checkbox" id="imagesOnly" />
+            <span>With images only</span>
+          </label>
+          <label class="lbl">Day
+            <input id="day" class="input" type="date" />
+          </label>
+        </div>
       </div>
 
-      <div class="filters" role="region" aria-label="Filters">
-        <label class="chk">
-          <input type="checkbox" id="imagesOnly" />
-          <span>With images only</span>
+      <div class="toolbar__right" role="region" aria-label="Grouping">
+        <label class="lbl">Group by
+          <select id="groupBy" class="input">
+            <option value="">None</option>
+            <option value="day">Day</option>
+            <option value="author">Author</option>
+            <option value="group">Group</option>
+          </select>
         </label>
-        <label class="lbl">Day
-          <input id="day" class="input" type="date" />
+        <label class="lbl">Items / group
+          <input id="itemsPerGroup" class="input" type="number" min="1" max="20" value="5" />
         </label>
       </div>
     </div>

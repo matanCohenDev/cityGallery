@@ -20,11 +20,7 @@ async function api(path, method = 'GET', body) {
 
   let data = {};
   const text = await res.text();
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = {};
-  }
+  try { data = JSON.parse(text); } catch { data = {}; }
 
   if (!res.ok) throw new Error(data.message || data.msg || res.statusText);
   return data;
@@ -47,9 +43,7 @@ $('#logoutBtn')?.addEventListener('click', async () => {
     await api('/api/users/logout', 'POST');
     await loadUser();
     window.location.href = '/index.html';
-  } catch (e) { 
-    alert('Logout error: ' + e.message); 
-  }
+  } catch (e) { alert('Logout error: ' + e.message); }
 });
 
 // ===== state & filters =====
@@ -58,22 +52,12 @@ let pages = 1;
 let loading = false;
 let lastQueryKey = '';
 
-// single-day control (instead of from/to)
 const dayEl = $('#day');
 
 // helper: exact local day range (no UTC misparse)
-const parseYMD = (s) => {
-  const [y, m, d] = s.split('-').map(Number);
-  return { y, m: m - 1, d };
-};
-const startOfDayLocal = (s) => {
-  const { y, m, d } = parseYMD(s);
-  return new Date(y, m, d, 0, 0, 0, 0).getTime();
-};
-const endOfDayLocal = (s) => {
-  const { y, m, d } = parseYMD(s);
-  return new Date(y, m, d, 23, 59, 59, 999).getTime();
-};
+const parseYMD = (s) => { const [y,m,d] = s.split('-').map(Number); return { y, m:m-1, d }; };
+const startOfDayLocal = (s) => { const {y,m,d}=parseYMD(s); return new Date(y,m,d,0,0,0,0).getTime(); };
+const endOfDayLocal   = (s) => { const {y,m,d}=parseYMD(s); return new Date(y,m,d,23,59,59,999).getTime(); };
 
 // initialize day with today
 (function seedToday() {
@@ -85,13 +69,22 @@ const endOfDayLocal = (s) => {
 })();
 
 function buildParams() {
-  // keep server paging+search, but local filters decide final set.
   const params = new URLSearchParams();
   const q = $('#q')?.value.trim() || '';
   const imagesOnly = $('#imagesOnly')?.checked || false;
+  const groupBy = $('#groupBy')?.value || '';
+  const itemsPerGroup = parseInt($('#itemsPerGroup')?.value || '5', 10);
 
   if (q) params.set('q', q);
   if (imagesOnly) params.set('imagesOnly', 'true');
+
+  // קיבוץ — נשלח רק אם המשתמש בחר
+  if (groupBy) {
+    params.set('groupBy', groupBy);
+    if (!Number.isNaN(itemsPerGroup) && itemsPerGroup > 0) {
+      params.set('itemsPerGroup', String(Math.min(itemsPerGroup, 20)));
+    }
+  }
 
   params.set('page', String(page));
   params.set('limit', '10');
@@ -102,7 +95,9 @@ function queryKey() {
   return JSON.stringify({
     q: $('#q')?.value.trim() || '',
     imagesOnly: $('#imagesOnly')?.checked || false,
-    day: $('#day')?.value || ''
+    day: $('#day')?.value || '',
+    groupBy: $('#groupBy')?.value || '',
+    itemsPerGroup: $('#itemsPerGroup')?.value || ''
   });
 }
 
@@ -163,9 +158,7 @@ function skeleton(count = 3) {
 }
 
 function htmlEscape(s) {
-  return String(s ?? '').replace(/[&<>"]/g, c => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'
-  }[c]));
+  return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
 
 function makePostCard(p) {
@@ -197,13 +190,49 @@ function makePostCard(p) {
   return li;
 }
 
+// --- rendering (plain list) ---
 function renderItems(items, { append = false } = {}) {
   const list = $('#feedList');
   if (!append) list.innerHTML = '';
   $('#empty').classList.toggle('hidden', items.length !== 0 || append);
-  for (const p of items) {
-    list.appendChild(makePostCard(p));
+  for (const p of items) list.appendChild(makePostCard(p));
+}
+
+// --- rendering (grouped) ---
+function makeGroupBlock(g, groupBy) {
+  const wrap = document.createElement('li');
+  wrap.className = 'group';
+
+  // key label
+  let label = '';
+  if (groupBy === 'day') {
+    label = g.key; // 'YYYY-MM-DD'
+  } else if (groupBy === 'author') {
+    label = g.key?.username || '(Unknown)';
+  } else if (groupBy === 'group') {
+    label = g.key?.name || '(No group)';
+  } else {
+    label = String(g.key ?? '');
   }
+
+  wrap.innerHTML = `
+    <div class="group__head">
+      <h3 class="group__title">${htmlEscape(label)}</h3>
+      <span class="group__meta">${g.count} item(s)</span>
+    </div>
+    <ul class="group__items"></ul>
+  `;
+  const ul = wrap.querySelector('.group__items');
+  const filtered = applyLocalFilters(g.items || []);
+  for (const p of filtered) ul.appendChild(makePostCard(p));
+  return wrap;
+}
+
+function renderGroups(groups, groupBy, { append = false } = {}) {
+  const list = $('#feedList');
+  if (!append) list.innerHTML = '';
+  $('#empty').classList.toggle('hidden', (groups?.length ?? 0) !== 0 || append);
+  for (const g of groups) list.appendChild(makeGroupBlock(g, groupBy));
 }
 
 // ===== data load =====
@@ -211,17 +240,30 @@ async function loadPosts({ append = false } = {}) {
   if (loading) return;
   loading = true;
 
-  if (!append) skeleton(4);
+  if (!append) skeleton(3);
 
   try {
     const params = buildParams();
     const data = await api('/api/posts?' + params.toString());
 
-    pages = Array.isArray(data) ? 1 : (data.pages || 1);
-    const rawItems = Array.isArray(data) ? data : (data.items || []);
+    // וורסיה רגילה (ללא groupBy): { items, total, page, pages }
+    // וורסיה מקובצת: { groupBy, groups, totalGroups, page, pages, ... }
+    const groupBy = $('#groupBy')?.value || '';
 
-    const filtered = applyLocalFilters(rawItems);
-    renderItems(filtered, { append });
+    pages = (() => {
+      if (Array.isArray(data)) return 1;
+      if (groupBy) return data.pages || 1;
+      return data.pages || 1;
+    })();
+
+    if (groupBy) {
+      const groups = data.groups || [];
+      renderGroups(groups, groupBy, { append });
+    } else {
+      const rawItems = Array.isArray(data) ? data : (data.items || []);
+      const filtered = applyLocalFilters(rawItems);
+      renderItems(filtered, { append });
+    }
   } catch (e) {
     console.error(e);
     if (!append) {
@@ -258,36 +300,24 @@ const requery = () => {
 $('#q')?.addEventListener('input', requery);
 $('#imagesOnly')?.addEventListener('change', requery);
 $('#day')?.addEventListener('change', requery);
+$('#groupBy')?.addEventListener('change', requery);
+$('#itemsPerGroup')?.addEventListener('change', requery);
 
 // empty-state new post
 $('#emptyNewPost')?.addEventListener('click', () => openModal());
 
 // ===== modal: create post =====
 const modal = $('#modal');
-function lockScroll(yes) {
-  document.body.style.overflow = yes ? 'hidden' : '';
-}
-function openModal() { 
-  if (!modal) return;
-  modal.classList.remove('hidden'); 
-  lockScroll(true); 
-}
-function closeModal() { 
-  if (!modal) return;
-  modal.classList.add('hidden');  
-  lockScroll(false); 
-}
+function lockScroll(yes) { document.body.style.overflow = yes ? 'hidden' : ''; }
+function openModal() { if (!modal) return; modal.classList.remove('hidden'); lockScroll(true); }
+function closeModal() { if (!modal) return; modal.classList.add('hidden');  lockScroll(false); }
 
 $('#newPostBtn')?.addEventListener('click', openModal);
 $('#closeModal')?.addEventListener('click', closeModal);
 $('#cancelPost')?.addEventListener('click', closeModal);
 
-modal?.addEventListener('click', (e) => {
-  if (e.target === modal) closeModal();
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !modal?.classList.contains('hidden')) closeModal();
-});
+modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal?.classList.contains('hidden')) closeModal(); });
 
 // image preview (local)
 const imageFileEl = document.querySelector('input[name="imageFile"]');
@@ -320,27 +350,19 @@ function clearFormFields(form){
 }
 
 $('#clearForm')?.addEventListener('click', () => {
-  const f = $('#postForm');
-  if (f) clearFormFields(f);
+  const f = $('#postForm'); if (f) clearFormFields(f);
 });
 
 $('#saveDraft')?.addEventListener('click', async () => {
-  const f = $('#postForm');
-  if (!f) return;
-
-  const title        = f.title?.value?.trim() || '';
-  const content      = f.content?.value?.trim() || '';
-
-  // השדות הבאים לא קיימים בטופס – לכן חובה עם ?.
+  const f = $('#postForm'); if (!f) return;
+  const title   = f.title?.value?.trim() || '';
+  const content = f.content?.value?.trim() || '';
   const tags         = f.tags?.value?.trim() || '';
   const location     = f.location?.value?.trim() || '';
   const visibility   = f.visibility?.value || 'public';
   const allowComments= !!f.allowComments?.checked;
 
-  if (!title && !content) {
-    alert('Nothing to save. Add a title or content.');
-    return;
-  }
+  if (!title && !content) { alert('Nothing to save. Add a title or content.'); return; }
 
   try {
     const payload = { title, content, tags, location, visibility, allowComments, status: 'draft' };
@@ -352,24 +374,18 @@ $('#saveDraft')?.addEventListener('click', async () => {
   }
 });
 
-
 $('#postForm')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
 
-  const title        = f.title?.value?.trim() || '';
-  const content      = f.content?.value?.trim() || '';
-
-  // לא קיימים בטופס? אין בעיה, ברירת מחדל תופסת
+  const title   = f.title?.value?.trim() || '';
+  const content = f.content?.value?.trim() || '';
   const tags         = f.tags?.value?.trim() || '';
   const location     = f.location?.value?.trim() || '';
   const visibility   = f.visibility?.value || 'public';
   const allowComments= !!f.allowComments?.checked;
 
-  if (!title || !content) {
-    alert('Please fill title and content');
-    return;
-  }
+  if (!title || !content) { alert('Please fill title and content'); return; }
 
   try {
     const payload = { title, content, tags, location, visibility, allowComments, status: 'published' };
@@ -390,7 +406,6 @@ $('#postForm')?.addEventListener('submit', async (e) => {
     alert('Create post error: ' + e.message);
   }
 });
-
 
 // ===== init =====
 (async function init() {

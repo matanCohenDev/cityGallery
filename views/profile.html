@@ -39,9 +39,6 @@
         <p class="muted" id="profileSubtitle">Your posts and statuses</p>
         <div class="hero__stats" id="heroStats" aria-live="polite"></div>
       </div>
-      <div class="hero__actions">
-        <button id="openCreatePost" class="btn btn--primary">Create</button>
-      </div>
     </div>
   </section>
 
@@ -129,7 +126,7 @@
   <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
     <div class="modal__card" role="document">
       <div class="modal__header">
-        <h3 id="settingsTitle">Settings</h3>
+        <h3 id="settingsTitle">edit profile</h3>
         <button id="closeSettings" class="icon-btn" aria-label="Close">✕</button>
       </div>
 
@@ -168,6 +165,46 @@
 
   <!-- Toast -->
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <!-- Edit modal -->
+  <div id="editModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+    <div class="modal__card view-modal" role="document">
+      <div class="modal__header">
+        <h3 id="editTitle">Edit post</h3>
+        <button id="closeEdit" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <form id="editForm" class="modal__body" novalidate>
+        <div id="editPreviewBox">
+          <!-- תמונה תוצג כאן דינמית -->
+        </div>
+        <fieldset class="fieldset">
+          <legend>Content</legend>
+          <label>Title
+            <input class="input" name="title" placeholder="Post title" required />
+          </label>
+          <label>Text
+            <textarea class="input" name="content" rows="4" placeholder="Write something…" required></textarea>
+          </label>
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend>Image</legend>
+          <label>Replace image
+            <input class="input" name="imageFile" type="file" accept="image/*" />
+          </label>
+          <div id="editImagePreview" class="img-preview hidden" aria-live="polite"></div>
+          <label class="checkbox" style="margin-top:6px">
+            <input type="checkbox" name="removeImage" />
+            <span>Remove current image</span>
+          </label>
+        </fieldset>
+        <div class="actions">
+          <button type="button" class="btn" id="cancelEdit">Cancel</button>
+          <button type="submit" class="btn btn--primary">Save changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
 
   <script src="/JS/profile.js" defer></script>
 </body>
