@@ -6,6 +6,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="CityGallery — a clean social network for photo galleries with maps and groups." />
   <link rel="stylesheet" href="/CSS/landingPage.css" />
+
+  <!-- Leaflet (OSM) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
 </head>
 <body>
   <!-- Header -->
@@ -18,11 +31,10 @@
       <nav class="links" aria-label="Primary">
         <button id="logoutBtn" class="link" style="display:none">Back to feed</button>
       </nav>
-
     </div>
   </header>
 
-  <!-- Hero (fills the screen between header & footer) -->
+  <!-- Hero -->
   <main class="hero">
     <div class="container hero__grid">
       <!-- Left: Content -->
@@ -57,6 +69,54 @@
           </li>
         </ul>
 
+        <!-- Weather metrics (Spotlight + Map) -->
+        <section class="metrics">
+
+          <div class="metrics-grid">
+            <!-- Card: Spotlight only -->
+            <article class="metric-card">
+              <div class="metric-card__body">
+                <div id="citySpotlight" class="spotlight-card"></div>
+              </div>
+            </article>
+
+            <!-- Card: Map of branches -->
+            <article class="metric-card">
+              <div class="metric-card__body metric-card__body--nopad">
+                <div id="branchesMap" class="map-box" aria-label="Branches map"></div>
+                <div id="branchesEmpty" class="map-empty muted" style="display:none">No branches to show.</div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- Community stats (charts) -->
+        <section class="metrics">
+          <div class="metrics-head">
+          </div>
+
+          <div class="metrics-grid">
+            <article class="metric-card">
+              <header class="metric-card__head">
+                <h3>Posts in the last 14 days</h3>
+              </header>
+              <div class="metric-card__body">
+                <canvas id="chartPosts14" height="120"></canvas>
+              </div>
+            </article>
+
+            <article class="metric-card">
+              <header class="metric-card__head">
+                <h3>Top 5 groups by size</h3>
+              </header>
+              <div class="metric-card__body">
+                <canvas id="chartTopGroups" height="120"></canvas>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- Static counters -->
         <div class="stats">
           <div class="stat"><span class="num">12k+</span><span class="lbl">photos shared</span></div>
           <div class="divider"></div>
@@ -64,37 +124,6 @@
           <div class="divider"></div>
           <div class="stat"><span class="num">120</span><span class="lbl">cities mapped</span></div>
         </div>
-        <!-- Metrics (NEW) -->
-        <section class="metrics">
-          <div class="container">
-            <div class="metrics-head">
-              <h2 class="metrics-title">Community activity</h2>
-              <p class="metrics-sub muted">Live snapshot from the last days</p>
-            </div>
-
-            <div class="metrics-grid">
-              <article class="metric-card">
-                <header class="metric-card__head">
-                  <h3>Posts in the last 14 days</h3>
-                </header>
-                <div class="metric-card__body">
-                  <canvas id="chartPosts14" height="120"></canvas>
-                </div>
-              </article>
-
-              <article class="metric-card">
-                <header class="metric-card__head">
-                  <h3>Top 5 groups by size</h3>
-                </header>
-                <div class="metric-card__body">
-                  <canvas id="chartTopGroups" height="120"></canvas>
-                </div>
-              </article>
-            </div>
-          </div>
-        </section>
-
-
       </section>
 
       <!-- Right: Auth Card -->
@@ -131,7 +160,7 @@
       </aside>
     </div>
 
-    <!-- Decorative background collage (no interaction) -->
+    <!-- Decorative background -->
     <div class="bg-shapes" aria-hidden="true">
       <div class="blob b1"></div>
       <div class="blob b2"></div>
@@ -145,7 +174,10 @@
       <span class="muted">Made for sharing cities — clean & timeless</span>
     </div>
   </footer>
+
+  <!-- Charts (for community metrics) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- App -->
   <script src="/JS/landingPage.js"></script>
 </body>
 </html>

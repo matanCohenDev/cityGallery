@@ -65,6 +65,7 @@ app.use('/api/branches', require('./routes/galleryBranches_routes'));
 app.use('/api/groups',   require('./routes/groups_routes'));
 app.use('/api/uploads',  require('./routes/uploads_routes'));
 app.use('/api/metrics', require('./routes/metrics_routes'));
+app.use('/api/weather', require('./routes/weather_routes'));
 
 // דפי אפליקציה (חסומים ללא סשן ע"י השומר הגלובלי מעל)
 app.get('/profile', (req, res) => {
