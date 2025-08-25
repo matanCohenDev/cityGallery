@@ -16,27 +16,22 @@ const {
 
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 
-// ===== Auth =====
 router.post('/register', createUser);
 router.post('/login',    loginUser);
 router.post('/logout',   logout);
 
-// ===== Me =====
 router.get('/me',        currentUser);
 
-// פרופיל עצמי — תואם לנסיונות שהפרונט שלך מבצע
 router.patch('/me',          requireAuth, updateMe);
-router.patch('/profile',     requireAuth, updateProfileAlias); // alias
-router.put('/update',        requireAuth, updateProfileAlias); // alias
+router.patch('/profile',     requireAuth, updateProfileAlias);
+router.put('/update',        requireAuth, updateProfileAlias); 
 
-// שינוי סיסמה — תואם לכל הראוטים שהפרונט מנסה
 router.post('/change-password',    requireAuth, changePassword);
 router.patch('/me/password',       requireAuth, changePasswordPatch);
 router.put('/password',            requireAuth, changePasswordPatch);
 
-// ===== Admin / collection =====
 router.get('/',                requireAdmin, getUsers);
-router.patch('/:id',           requireAuth,  updateUser);   // ודא שבמידלוור אתה בודק הרשאות (עצמי/אדמין)
+router.patch('/:id',           requireAuth,  updateUser);   
 router.delete('/:id',          requireAdmin, deleteUser);
 
 module.exports = router;

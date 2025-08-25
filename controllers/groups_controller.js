@@ -21,7 +21,6 @@ exports.createGroup = async (req, res, next) => {
 
     await User.findByIdAndUpdate(uid, { $addToSet: { groups: g._id } });
 
-    // ציוץ (best-effort; לא מפיל את הבקשה אם נכשל)
     try {
       const tweetText = `New group just opened: "${name}" — join the community on CityGallery!`;
       const result = await postTweet(tweetText);
@@ -42,8 +41,6 @@ exports.createGroup = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// GET /api/groups
-// תומך: q, mine=1
 exports.listGroups = async (req, res, next) => {
   try {
     const { q, mine } = req.query;
@@ -64,7 +61,6 @@ exports.listGroups = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// GET /api/groups/mine
 exports.listMyGroups = async (req, res, next) => {
   try {
     if (!req.session?.userId) return res.status(401).json({ msg: 'Unauthorized' });
@@ -78,7 +74,6 @@ exports.listMyGroups = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// GET /api/groups/joinable  (כל הקבוצות שהמשתמש לא משתתף בהן)
 exports.listJoinableGroups = async (req, res, next) => {
   try {
     if (!req.session?.userId) return res.status(401).json({ msg: 'Unauthorized' });
@@ -88,7 +83,6 @@ exports.listJoinableGroups = async (req, res, next) => {
     const lim = Math.max(1, Math.min(parseInt(limit || '50', 10) || 50, 200));
     const textFilter = q ? { name: { $regex: q, $options: 'i' } } : {};
 
-    // לא בעלים ולא חבר (members array)
     const query = {
       ...textFilter,
       owner: { $ne: uid },
@@ -105,7 +99,6 @@ exports.listJoinableGroups = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// POST /api/groups/:id/join
 exports.joinGroup = async (req, res, next) => {
   try {
     if (!req.session?.userId) return res.status(401).json({ msg: 'Unauthorized' });
@@ -124,7 +117,6 @@ exports.joinGroup = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// POST /api/groups/:id/leave
 exports.leaveGroup = async (req, res, next) => {
   try {
     if (!req.session?.userId) return res.status(401).json({ msg: 'Unauthorized' });
@@ -143,7 +135,6 @@ exports.leaveGroup = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// PATCH /api/groups/:id (owner only)
 exports.updateGroup = async (req, res, next) => {
   try {
     if (!req.session?.userId) return res.status(401).json({ msg: 'Unauthorized' });
@@ -161,7 +152,6 @@ exports.updateGroup = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// GET /api/groups/:id/members
 exports.listGroupMembers = async (req, res, next) => {
   try {
     if (!req.session?.userId) return res.status(401).json({ msg: 'Unauthorized' });
@@ -178,7 +168,6 @@ exports.listGroupMembers = async (req, res, next) => {
     const isMember = Array.isArray(g.members) && g.members.some(m => String(m._id || m) === String(uid));
     if (!isOwner && !isMember) return res.status(403).json({ msg: 'Forbidden' });
 
-    // ✅ נחזיר _id כמחרוזת כדי שלא יהיו בעיות השוואה בצד הלקוח
     const members = (g.members || []).map(m => ({
       _id: String(m._id || m),
       username: m.username || 'User',
@@ -194,7 +183,6 @@ exports.listGroupMembers = async (req, res, next) => {
 };
 
 
-// DELETE /api/groups/:id/members/:userId
 exports.removeMember = async (req, res, next) => {
   try {
     if (!req.session?.userId) return res.status(401).json({ msg: 'Unauthorized' });
@@ -202,7 +190,6 @@ exports.removeMember = async (req, res, next) => {
     const uid = String(req.session.userId);
     const { id, userId } = req.params;
 
-    // ✅ ולידציה בטוחה לפרמטרים
     if (!mongoose.isValidObjectId(id) || !mongoose.isValidObjectId(userId)) {
       return res.status(400).json({ msg: 'Invalid id' });
     }
@@ -216,24 +203,20 @@ exports.removeMember = async (req, res, next) => {
       return res.status(400).json({ msg: 'Cannot remove the owner' });
     }
 
-    // ✅ ודא שאכן חבר לפני הניסיון להסיר
     const isActuallyMember = (g.members || []).some(m => String(m) === String(userId));
     if (!isActuallyMember) {
       return res.status(404).json({ msg: 'User is not a member of this group' });
     }
 
-    // ✅ הסרה אטומית + בדיקה שבוצעה הסרה (modifiedCount)
     const pullRes = await Group.updateOne(
       { _id: OID(id) },
       { $pull: { members: { $in: [String(userId), OID(userId)] } } }
     );
 
     if (!pullRes.modifiedCount) {
-      // אם מסיבה כלשהי לא הוסר — נחזיר 409 כדי שיהיה ברור ללקוח
       return res.status(409).json({ msg: 'Failed to remove member' });
     }
 
-    // הסרת זיקת הקבוצה מהמשתמש (לא קריטי אם לא קיים השדה — $pull idempotent)
     await User.updateOne(
       { _id: OID(userId) },
       { $pull: { groups: { $in: [String(id), OID(id)] } } }
@@ -249,7 +232,6 @@ exports.removeMember = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// DELETE /api/groups/:id (owner only)
 exports.deleteGroup = async (req, res, next) => {
   try {
     if (!req.session?.userId) return res.status(401).json({ msg: 'Unauthorized' });
@@ -264,13 +246,11 @@ exports.deleteGroup = async (req, res, next) => {
       return res.status(403).json({ msg: 'Only owner can delete' });
     }
 
-    // הסר את מזהה הקבוצה מכל המשתמשים (כולל הבעלים)
     await User.updateMany(
       { groups: { $in: [String(g._id), g._id] } },
       { $pull: { groups: { $in: [String(g._id), g._id] } } }
     );
 
-    // מחיקת הקבוצה
     await g.deleteOne();
 
     return res.json({ msg: 'Group deleted', id: String(id) });

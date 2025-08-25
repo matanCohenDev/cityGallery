@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 require('dotenv').config();
 const mongoose = require('mongoose');
 const Branch = require('../models/galleryBranches_model');
@@ -43,7 +42,6 @@ const MOCK_BRANCHES = [
     await mongoose.connect(MONGO, { });
     console.log('connected to db');
 
-    // מנקה דאטא ישן (אופציונלי)
     await Branch.deleteMany({});
     await Branch.insertMany(MOCK_BRANCHES);
 
@@ -52,7 +50,6 @@ const MOCK_BRANCHES = [
     console.error('ERROR:', err);
     process.exitCode = 1;
   } finally {
-    // ניתוק אלגנטי ומסתיים
     await mongoose.disconnect();
   }
 })();

@@ -7,7 +7,6 @@
   <meta name="description" content="CityGallery — a clean social network for photo galleries with maps and groups." />
   <link rel="stylesheet" href="/CSS/landingPage.css" />
 
-  <!-- Leaflet (OSM) -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -21,7 +20,6 @@
   ></script>
 </head>
 <body>
-  <!-- Header -->
   <header class="header">
     <div class="container nav">
       <a class="brand" href="#">
@@ -34,28 +32,23 @@
     </div>
   </header>
 
-  <!-- Hero -->
   <main class="hero">
     <div class="container hero__grid">
-      <!-- Left: Content -->
       <section class="content">
         <h1>Galleries. Map. Community.<br><span class="accent">All in a clean, modern space.</span></h1>
         <p class="lead">
           CityGallery helps you share the places you love through photos.
           Pin posts to a live map, follow creators, and build your own visual story — with a calm, elegant design.
         </p>
-        <!-- Weather metrics (Spotlight + Map) -->
         <section class="metrics">
 
           <div class="metrics-grid">
-            <!-- Card: Spotlight only -->
             <article class="metric-card">
               <div class="metric-card__body">
                 <div id="citySpotlight" class="spotlight-card"></div>
               </div>
             </article>
 
-            <!-- Card: Map of branches -->
             <article class="metric-card">
               <div class="metric-card__body metric-card__body--nopad">
                 <div id="branchesMap" class="map-box" aria-label="Branches map"></div>
@@ -65,7 +58,6 @@
           </div>
         </section>
 
-        <!-- Community stats (charts) -->
         <section class="metrics">
           <div class="metrics-head">
           </div>
@@ -92,7 +84,6 @@
         </section>
       </section>
 
-      <!-- Right: Auth Card -->
       <aside class="auth card" aria-label="Authentication">
         <div class="tabs" role="tablist">
           <button class="tab active" data-tab="login"    role="tab" aria-selected="true">Log in</button>
@@ -126,14 +117,12 @@
       </aside>
     </div>
 
-    <!-- Decorative background -->
     <div class="bg-shapes" aria-hidden="true">
       <div class="blob b1"></div>
       <div class="blob b2"></div>
     </div>
   </main>
 
-  <!-- Footer -->
   <footer class="footer">
     <div class="container footer__row">
       <span>© <span id="year"></span> CityGallery</span>
@@ -141,9 +130,7 @@
     </div>
   </footer>
 
-  <!-- Charts (for community metrics) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- App -->
   <script src="/JS/landingPage.js"></script>
 </body>
 </html>

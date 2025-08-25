@@ -1,4 +1,3 @@
-// server/models/posts_model.js
 const mongoose = require('mongoose');
 const { Schema, Types } = mongoose;
 
@@ -23,7 +22,6 @@ const postSchema = new Schema({
     }
   },
 
-  // --- חדש: לייקים ותגובות ---
   likes:    [{ type: Types.ObjectId, ref: 'User' }],
   comments: [CommentSchema],
 

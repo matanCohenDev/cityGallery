@@ -1,7 +1,5 @@
-// Footer year
 document.getElementById('year').textContent = new Date().getFullYear();
 
-// Tabs
 const tabs = document.querySelectorAll('.tab');
 const panels = document.querySelectorAll('.panel');
 tabs.forEach(t => t.addEventListener('click', () => {
@@ -11,7 +9,6 @@ tabs.forEach(t => t.addEventListener('click', () => {
   document.getElementById(t.dataset.tab + 'Form').classList.add('active');
 }));
 
-// API helper
 async function api(path, method='GET', body){
   const res = await fetch(path, {
     method,
@@ -24,7 +21,6 @@ async function api(path, method='GET', body){
   return data;
 }
 
-// Register
 document.getElementById('registerForm').addEventListener('submit', async e=>{
   e.preventDefault();
   const f = e.target;
@@ -41,7 +37,6 @@ document.getElementById('registerForm').addEventListener('submit', async e=>{
   }
 });
 
-// Login
 document.getElementById('loginForm').addEventListener('submit', async e=>{
   e.preventDefault();
   const f = e.target;
@@ -56,7 +51,6 @@ document.getElementById('loginForm').addEventListener('submit', async e=>{
   }
 });
 
-// Header button (Back to feed when logged-in)
 const headerBtn = document.getElementById('logoutBtn');
 
 function setHeaderForGuest(){
@@ -72,7 +66,6 @@ function setHeaderForUser(){
   headerBtn.onclick = () => { window.location.href = '/feed'; };
 }
 
-// Lock/unlock auth forms
 const authCard  = document.querySelector('.auth.card');
 const tabButtons = document.querySelectorAll('.tabs .tab');
 const authForms = [
@@ -103,7 +96,6 @@ function setAuthEnabled(enabled){
   authCard?.classList.toggle('auth-locked', !enabled);
 }
 
-// Who am I? decide header + lock forms
 async function whoAmI(){
   try{
     const me = await api('/api/users/me');
@@ -122,9 +114,6 @@ async function whoAmI(){
 }
 whoAmI();
 
-/* =======================
-   Weather — MOCK dataset
-   ======================= */
 const MOCK_GALLERY_WEATHER = [
   { city: 'Tel Aviv', country: 'IL', tempC: 29, condition: 'Clear' },
   { city: 'Paris',    country: 'FR', tempC: 17, condition: 'Clouds' },
@@ -134,7 +123,6 @@ const MOCK_GALLERY_WEATHER = [
   { city: 'Sydney',   country: 'AU', tempC: 21, condition: 'Clear' },
 ];
 
-// Simple advice by temp/condition
 function visitAdvice(tempC, condition){
   if (/rain/i.test(condition)) return { tag:'bad',  text:'Not great (rainy)' };
   if (tempC >= 18 && tempC <= 28) return { tag:'good', text:'Great time to visit' };
@@ -142,20 +130,17 @@ function visitAdvice(tempC, condition){
   return { tag:'ok', text:'Okay, depends on you' };
 }
 
-/* ========= Charts ========= */
 function renderWeatherCharts(data){
   const barCanvas   = document.getElementById('chartTemps');
   const donutCanvas = document.getElementById('chartDonut');
   const legendEl    = document.getElementById('donutLegend');
   if (!barCanvas || !donutCanvas) return;
 
-  // Build arrays
   const labels = data.map(r => r.city);
   const temps  = data.map(r => r.tempC);
   const counts = { good:0, ok:0, bad:0 };
   data.forEach(r => counts[visitAdvice(r.tempC, r.condition).tag]++);
 
-  // Bar (temps)
   new Chart(barCanvas, {
     type: 'bar',
     data: {
@@ -177,7 +162,6 @@ function renderWeatherCharts(data){
     }
   });
 
-  // Donut (advice)
   const donut = new Chart(donutCanvas, {
     type: 'doughnut',
     data: {
@@ -192,7 +176,6 @@ function renderWeatherCharts(data){
     }
   });
 
-  // Legend using same colors
   const colors = donut.data.datasets[0].backgroundColor ||
                  donut.getDatasetMeta(0).controller.getStyle(0).backgroundColor;
   const colorAt = i => Array.isArray(colors) ? colors[i] : undefined;
@@ -204,7 +187,6 @@ function renderWeatherCharts(data){
   `;
 }
 
-/* ===== Spotlight (one city at a time) ===== */
 let spotlightTimer = null;
 let spotlightIndex = 0;
 
@@ -224,29 +206,24 @@ function startCitySpotlight(data, { intervalMs = 3500 } = {}){
   const host = document.getElementById('citySpotlight');
   if (!host || !Array.isArray(data) || !data.length) return;
 
-  // first render
   spotlightIndex = 0;
   renderCitySpotlightItem(host, data[spotlightIndex]);
 
-  // stop previous
   if (spotlightTimer) clearInterval(spotlightTimer);
 
-  // rotate
   const step = () => {
     spotlightIndex = (spotlightIndex + 1) % data.length;
     renderCitySpotlightItem(host, data[spotlightIndex]);
   };
   spotlightTimer = setInterval(step, intervalMs);
 
-  // pause on hover (nice UX)
   host.addEventListener('mouseenter', () => { if (spotlightTimer) { clearInterval(spotlightTimer); spotlightTimer = null; }});
   host.addEventListener('mouseleave', () => { if (!spotlightTimer) spotlightTimer = setInterval(step, intervalMs); });
 }
 
-/* ===== Community charts (ready for API) ===== */
 async function fetchMetrics(){
   try{
-    const data = await api('/api/metrics/landing'); // אם אין אצלך – פשוט יתפוס catch ויתעלם
+    const data = await api('/api/metrics/landing'); 
     return data || {};
   }catch{ return {}; }
 }
@@ -299,11 +276,9 @@ function renderGroupsChart(ctx, labels, values){
   });
 }
 async function initLandingCharts(){
-  // Weather (mock)
   renderWeatherCharts(MOCK_GALLERY_WEATHER);
   startCitySpotlight(MOCK_GALLERY_WEATHER, { intervalMs: 3500 });
 
-  // Community – attempt API, otherwise render empties
   const { postsLast14 = [], topGroups = [] } = await fetchMetrics();
   const s = ensureSeriesFor14Days(postsLast14);
   const postsCtx = document.getElementById('chartPosts14')?.getContext('2d');
@@ -314,7 +289,6 @@ async function initLandingCharts(){
   const groupsCtx = document.getElementById('chartTopGroups')?.getContext('2d');
   if(groupsCtx) renderGroupsChart(groupsCtx, gLabels, gValues);
 }
-// במקום הבלוק הקיים שמפעיל רק initLandingCharts:
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', onReady);
 } else {
@@ -323,21 +297,19 @@ if (document.readyState === 'loading') {
 
 async function onReady(){
   try {
-    await initLandingCharts();  // הגרפים/ספוט־לייט (אם יש)
+    await initLandingCharts();  
   } catch(e){ console.warn('initLandingCharts error:', e); }
 
   try {
-    await initBranchesMap();    // ✅ מפעיל את המפה
+    await initBranchesMap();    
   } catch(e){ console.warn('initBranchesMap error:', e); }
 }
 
 
-/* ========== Branches Map (Leaflet) ========== */
-let branchesMap = null;       // שמור מופע למניעת ריבוי אתחולים
+let branchesMap = null;       
 let branchesLayerGroup = null;
 
 async function fetchBranches(){
-  // מחזיר מערך סניפים: [{_id, name, address, coordinates:{lat,lng}}, ...]
   try{
     const res = await fetch('/api/branches', { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to load branches');
@@ -352,7 +324,6 @@ function initBranchesLeafletMap(){
   const el = document.getElementById('branchesMap');
   if (!el) return;
 
-  // ניקוי מופע קודם אם היה
   if (branchesMap) {
     branchesMap.remove();
     branchesMap = null;
@@ -360,18 +331,16 @@ function initBranchesLeafletMap(){
 
   branchesMap = L.map(el, {
     zoomControl: true,
-    scrollWheelZoom: false,     // UX נעים בדף נחיתה
+    scrollWheelZoom: false,    
     attributionControl: false,
-  }).setView([20, 0], 2);       // תצוגת עולם ברירת מחדל
+  }).setView([20, 0], 2);      
 
-  // אריחי OSM
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19
   }).addTo(branchesMap);
 
   branchesLayerGroup = L.layerGroup().addTo(branchesMap);
 
-  // רספונסיב: להתאים גודל כשמכילים בגריד
   setTimeout(()=> branchesMap.invalidateSize(), 150);
 }
 
@@ -401,7 +370,6 @@ function addBranchesMarkers(branches){
     branchesMap.fitBounds(bounds, { padding: [18, 18] });
   } else {
     if (emptyEl) emptyEl.style.display = 'block';
-    // השאר זום עולם
     branchesMap.setView([20, 0], 2);
   }
 }
@@ -410,19 +378,15 @@ function escapeHtml(s){
   return String(s ?? '').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
 
-/* קריאה ראשית כחלק מה-init הכללי שלך */
 async function initBranchesMap(){
   initBranchesLeafletMap();
   const branches = await fetchBranches();
   addBranchesMarkers(branches);
 }
 
-/* בתוך initLanding() שלך, אחרי שאר ההפעלות: */
 async function initLanding(){
-  // ... (שאר ה־init שלך — Spotlight, Community charts וכו')
   startCitySpotlight(MOCK_GALLERY_WEATHER, { intervalMs: 3500 });
 
-  // Community charts ...
   const { postsLast14 = [], topGroups = [] } = await fetchMetrics();
   const s = ensureSeriesFor14Days(postsLast14);
   const postsCtx = document.getElementById('chartPosts14')?.getContext('2d');
@@ -432,7 +396,6 @@ async function initLanding(){
   const groupsCtx = document.getElementById('chartTopGroups')?.getContext('2d');
   if(groupsCtx) renderGroupsChart(groupsCtx, gLabels, gValues);
 
-  // ✅ init branches map (DB → /api/branches)
   await initBranchesMap();
 }
 
@@ -447,7 +410,6 @@ function addBranchesMarkers(branches){
     let lat = b?.coordinates?.lat;
     let lng = b?.coordinates?.lng;
 
-    // נרמול למספרים
     lat = typeof lat === 'string' ? parseFloat(lat) : lat;
     lng = typeof lng === 'string' ? parseFloat(lng) : lng;
 

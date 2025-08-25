@@ -1,4 +1,3 @@
-// ===== tiny helpers =====
 const $  = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 
@@ -10,7 +9,6 @@ function fmtExact(iso) {
   });
 }
 
-// unified JSON fetch
 async function fetchJSON(path, method='GET', body) {
   const res = await fetch(path, {
     method,
@@ -23,23 +21,19 @@ async function fetchJSON(path, method='GET', body) {
   return { res, data };
 }
 
-// basic api (single attempt)
 async function api(path, method='GET', body) {
   const { res, data } = await fetchJSON(path, method, body);
   if (!res.ok) throw new Error(data.message || data.msg || res.statusText);
   return data;
 }
 
-// multi-attempt API (helps avoid 404 on different servers)
 async function apiTry(attempts, body) {
   let lastErr = new Error('Request failed');
   for (const { path, method } of attempts) {
     try {
       const { res, data } = await fetchJSON(path, method, body);
       if (res.ok) return data;
-      // continue if "not found", try next route
       if (res.status === 404) { lastErr = new Error(data.message || res.statusText); continue; }
-      // for other statuses, stop and throw
       throw new Error(data.message || data.msg || res.statusText);
     } catch (e) {
       lastErr = e;
@@ -48,14 +42,13 @@ async function apiTry(attempts, body) {
   throw lastErr;
 }
 
-// ===== header user state =====
 let currentUser = null;
 
 async function loadUser() {
   try {
     const me = await api('/api/users/me');
     $('#userBadge').textContent = `Signed in as ${me.username || me.user?.username || 'User'}`;
-    currentUser = me.user || me; // normalize
+    currentUser = me.user || me; 
     return currentUser;
   } catch {
     $('#userBadge').textContent = 'Not signed in';
@@ -72,10 +65,8 @@ $('#logoutBtn')?.addEventListener('click', async () => {
   window.location.href = '/';
 });
 
-// ===== profile posts state =====
 let profilePosts = [];
 
-// ===== render helpers =====
 function htmlEscape(s) {
   return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
@@ -87,7 +78,6 @@ function heartSvg() {
     </svg>`;
 }
 
-// --- actions bar (likes/comments) ---
 function makeActionsBar(p) {
   const likedClass = p.userLiked ? 'liked' : '';
   return `
@@ -103,7 +93,6 @@ function makeActionsBar(p) {
   `;
 }
 
-// --- admin bar (edit/delete only — Preview removed) ---
 function makeAdminBar(p){
   const id = p._id;
   return `
@@ -143,7 +132,6 @@ function makePostCard(p) {
     ${makeAdminBar(p)}
   `;
 
-  // wire events
   li.querySelector('.icon-like')?.addEventListener('click', onToggleLike);
   li.querySelector('.preview-btn')?.addEventListener('click', openPreviewFromBtn);
   li.querySelector('.edit-btn')?.addEventListener('click', (e)=> openEditPost(e.currentTarget.dataset.id));
@@ -152,7 +140,6 @@ function makePostCard(p) {
   return li;
 }
 
-// ===== utils: identify my post robustly =====
 function isMine(post, me) {
   if (!post || !me) return false;
 
@@ -175,7 +162,6 @@ function isMine(post, me) {
   return false;
 }
 
-// ===== load ONLY logged-in user's posts (client-filtered fallback) =====
 async function loadProfilePosts() {
   const me = currentUser || await loadUser();
   if (!me) {
@@ -253,7 +239,6 @@ function renderProfilePosts(items, gridId, emptyId) {
   items.forEach(p => grid.appendChild(makePostCard(p)));
 }
 
-// ======= Likes =======
 async function onToggleLike(ev) {
   if (!currentUser) { alert('Please sign in to like'); return; }
   const btn = ev.currentTarget.closest('.icon-like');
@@ -263,7 +248,6 @@ async function onToggleLike(ev) {
   const liked = btn.classList.contains('liked');
   const countEl = btn.querySelector('.like-count');
 
-  // optimistic
   btn.classList.toggle('liked');
   if (countEl) {
     const curr = parseInt(countEl.textContent || '0', 10) || 0;
@@ -280,7 +264,6 @@ async function onToggleLike(ev) {
       const pvHeart = $('#pv-like-btn');  if (pvHeart) pvHeart.classList.toggle('liked', !!res.liked);
     }
   } catch (e) {
-    // revert optimistic
     btn.classList.toggle('liked');
     if (countEl) {
       const curr = parseInt(countEl.textContent || '0', 10) || 0;
@@ -290,7 +273,6 @@ async function onToggleLike(ev) {
   }
 }
 
-// ======= Preview & Comments =======
 const previewModal = $('#previewModal');
 const closePreviewBtn = $('#closePreview');
 const previewBoxEl = $('#previewContent');
@@ -407,7 +389,6 @@ async function onAddComment(ev) {
   }
 }
 
-// ===== modal: create post =====
 const modal = $('#modal');
 function lockScroll(yes) { document.body.style.overflow = yes ? 'hidden' : ''; }
 function openModal() { if (!modal) return; modal.classList.remove('hidden'); lockScroll(true); }
@@ -422,7 +403,6 @@ $('#emptyNewPost2')?.addEventListener('click', openModal);
 modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal?.classList.contains('hidden')) closeModal(); });
 
-// image preview (local)
 const imageFileEl = document.querySelector('input[name="imageFile"]');
 const previewBox = $('#imagePreview');
 
@@ -434,7 +414,6 @@ imageFileEl?.addEventListener('change', () => {
   previewBox.classList.remove('hidden');
 });
 
-// upload helper
 async function uploadImage(file) {
   const fd = new FormData();
   fd.append('image', file);
@@ -443,7 +422,7 @@ async function uploadImage(file) {
     const txt = await res.text().catch(()=> '');
     throw new Error(`Upload failed (${res.status}): ${txt || res.statusText}`);
   }
-  return await res.json(); // { url }
+  return await res.json(); 
 }
 
 function clearFormFields(form){
@@ -489,7 +468,6 @@ $('#postForm')?.addEventListener('submit', async (e) => {
   }
 });
 
-// ===== settings modal =====
 const settingsModal = $('#settingsModal');
 const closeSettingsBtn = $('#closeSettings');
 const cancelSettingsBtn = $('#cancelSettings');
@@ -504,7 +482,6 @@ cancelSettingsBtn?.addEventListener('click', closeSettings);
 settingsModal?.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettings(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !settingsModal?.classList.contains('hidden')) closeSettings(); });
 
-// Load user data into settings form
 async function loadUserSettings() {
   try {
     const user = await api('/api/users/me');
@@ -519,7 +496,6 @@ async function loadUserSettings() {
   }
 }
 
-// Save settings (PATCH/PUT fallback to avoid 404)
 $('#settingsForm')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
@@ -553,7 +529,6 @@ $('#settingsForm')?.addEventListener('submit', async (e) => {
   }
 });
 
-// ===== Edit Post (modal) =====
 const editModal = $('#editModal');
 const closeEditBtn = $('#closeEdit');
 const cancelEditBtn = $('#cancelEdit');
@@ -570,7 +545,6 @@ function openEditPost(id){
   editState.id = id;
   editState.original = p;
 
-  // Prefill form
   editForm.title.value = p.title || '';
   editForm.content.value = p.content || '';
   editForm.removeImage.checked = false;
@@ -578,7 +552,6 @@ function openEditPost(id){
   editImagePreview.classList.add('hidden');
   editImagePreview.innerHTML = '';
 
-  // Preview current
   editPreviewBox.innerHTML = `
     ${p.images?.[0] ? `<img class="view-cover" src="${p.images[0]}" alt="">` : `<div class="muted">No image</div>`}
   `;
@@ -611,7 +584,6 @@ editForm?.addEventListener('submit', async (e)=>{
   try{
     const payload = { title, content };
 
-    // image handling
     const newFile = editImageFileEl?.files?.[0];
     if (removeImage){
       payload.images = [];
@@ -626,7 +598,6 @@ editForm?.addEventListener('submit', async (e)=>{
       { path: `/api/posts/${encodeURIComponent(id)}/update`, method: 'POST' },
     ], payload);
 
-    // update local + refresh lists
     const idx = profilePosts.findIndex(p => String(p._id) === String(id));
     if (idx !== -1) profilePosts[idx] = { ...profilePosts[idx], ...updated };
     await loadProfilePosts();
@@ -653,7 +624,6 @@ async function onDeletePost(id){
   }
 }
 
-// ===== Toast helpers =====
 function toastOK(msg){
   const t = $('#toast'); if(!t) return;
   t.textContent = msg; t.classList.remove('hidden','error'); t.classList.add('ok');
@@ -665,7 +635,6 @@ function toastErr(msg){
   setTimeout(()=> t.classList.add('hidden'), 2000);
 }
 
-// ===== Groups (mine + owned management) =====
 async function loadMyGroups(){
   const me = currentUser || await loadUser();
   if (!me) return;
@@ -749,7 +718,6 @@ function wireGroupCards(scope){
   }));
 }
 
-// ===== Create Group modal (fixed wiring) =====
 const groupModal = $('#groupModal');
 const closeGroupBtn = $('#closeGroup');
 const cancelGroupBtn = $('#cancelGroup');
@@ -783,7 +751,6 @@ groupForm?.addEventListener('submit', async (e)=>{
   }
 });
 
-// ===== Members modal =====
 const membersModal = $('#membersModal');
 const closeMembersBtn = $('#closeMembers');
 const membersSearch = $('#membersSearch');
@@ -902,10 +869,9 @@ function updateGroupCardCount(groupId, newCount){
   }
 }
 
-// ===== init =====
 (async function init() {
   await loadUser();
   await loadUserSettings();
-  await loadProfilePosts();     // only my posts
-  await loadMyGroups();         // my groups (owned + member)
+  await loadProfilePosts();    
+  await loadMyGroups();         
 })();

@@ -27,7 +27,6 @@ router.post('/:id/leave',    requireAuth, leaveGroup);
 router.patch('/:id',         requireAuth, updateGroup);
 router.delete('/:id',        requireAuth, deleteGroup);
 
-// routes/groups_routes.js
 router.get('/:id/tweet', async (req, res, next) => {
   try {
     const g = await Group.findById(req.params.id).lean();

@@ -7,19 +7,17 @@ const sanitizeUser = (u) => ({
   email: u.email,
   role: u.role,
   groups: u.groups,
-  bio: u.bio || '',        // אופציונלי — נוח לפרונט שלך
+  bio: u.bio || '',       
   createdAt: u.createdAt,
   updatedAt: u.updatedAt,
 });
 
-// Helper: attach sanitized user to session after changes
 function refreshSession(req, userDoc) {
   if (!req?.session) return;
   req.session.userId = userDoc._id;
   req.session.user = sanitizeUser(userDoc);
 }
 
-// Helper: uniform duplicate key error (E11000)
 function handleMongoDup(res, err) {
   if (err && err.code === 11000) {
     const key = Object.keys(err.keyPattern || {})[0] || 'field';
@@ -28,9 +26,6 @@ function handleMongoDup(res, err) {
   return null;
 }
 
-// ================== Auth flows ==================
-
-// POST /api/users/register
 exports.createUser = async (req, res, next) => {
   try {
     const { username, email, password, role } = req.body;
@@ -51,7 +46,6 @@ exports.createUser = async (req, res, next) => {
   }
 };
 
-// POST /api/users/login
 exports.loginUser = async (req, res, next) => {
   try {
     const { username, password } = req.body;
@@ -65,7 +59,6 @@ exports.loginUser = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// POST /api/users/logout
 exports.logout = (req, res) => {
   req.session?.destroy(() => {
     res.clearCookie('connect.sid');
@@ -73,7 +66,6 @@ exports.logout = (req, res) => {
   });
 };
 
-// GET /api/users/me
 exports.currentUser = async (req, res, next) => {
   try {
     if (!req.session?.userId) return res.status(401).json({ msg: 'No user logged in' });
@@ -83,9 +75,6 @@ exports.currentUser = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ================== Admin/user list & CRUD (admin) ==================
-
-// GET /api/users
 exports.getUsers = async (req, res, next) => {
   try {
     const list = await User.find().select('-password').lean();
@@ -93,7 +82,6 @@ exports.getUsers = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// PATCH /api/users/:id  (admin/self — תלוי במידלוור)
 exports.updateUser = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -101,13 +89,12 @@ exports.updateUser = async (req, res, next) => {
     const data = {};
     if (req.body.username != null) data.username = String(req.body.username).trim();
     if (req.body.email != null)    data.email    = String(req.body.email).trim().toLowerCase();
-    if (req.body.role != null)     data.role     = req.body.role; // ודא שמידלוור מגן על זה
+    if (req.body.role != null)     data.role     = req.body.role; 
     if (req.body.password)         data.password = await bcrypt.hash(req.body.password, 10);
 
     const u = await User.findByIdAndUpdate(id, data, { new: true, runValidators: true });
     if (!u) return res.status(404).json({ msg: 'User not found' });
 
-    // אם העדכון הוא על המשתמש המחובר — רענון סשן
     if (String(req.session?.userId) === String(u._id)) {
       refreshSession(req, u);
     }
@@ -118,7 +105,6 @@ exports.updateUser = async (req, res, next) => {
   }
 };
 
-// DELETE /api/users/:id
 exports.deleteUser = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -128,9 +114,6 @@ exports.deleteUser = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ================== Self profile update (matches frontend) ==================
-
-// PATCH /api/users/me  (and aliases) — update username/email for current user
 exports.updateMe = async (req, res, next) => {
   try {
     if (!req.session?.userId) return res.status(401).json({ msg: 'No user logged in' });
@@ -150,17 +133,13 @@ exports.updateMe = async (req, res, next) => {
     );
     if (!u) return res.status(404).json({ msg: 'User not found' });
 
-    refreshSession(req, u); // חשוב שהפרונט יראה ערכים מעודכנים
+    refreshSession(req, u); 
     res.json(sanitizeUser(u));
   } catch (err) {
     if (!handleMongoDup(res, err)) next(err);
   }
 };
 
-// ================== Password change for current user ==================
-
-// POST /api/users/change-password
-// Body: { currentPassword, newPassword }
 exports.changePassword = async (req, res, next) => {
   try {
     if (!req.session?.userId) return res.status(401).json({ msg: 'No user logged in' });
@@ -186,6 +165,5 @@ exports.changePassword = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// Alias controller to support PATCH /api/users/me/password and PUT /api/users/password
 exports.changePasswordPatch = exports.changePassword;
-exports.updateProfileAlias = exports.updateMe; // for /profile and /update
+exports.updateProfileAlias = exports.updateMe;

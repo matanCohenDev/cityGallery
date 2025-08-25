@@ -1,9 +1,7 @@
-// server/controllers/posts_controller.js
 const mongoose = require('mongoose');
 const Post = require('../models/posts_model');
 const { Types } = mongoose;
 
-// ===== helpers =====
 function parsePageLimit(req, defLimit = 24, maxLimit = 100) {
   const page = Math.max(1, parseInt(req.query.page || '1', 10));
   let limit = parseInt(req.query.limit || String(defLimit), 10);
@@ -60,7 +58,6 @@ function decorateCounts(doc, userId) {
   return d;
 }
 
-// ===== CRUD =====
 exports.createPost = async (req, res, next) => {
   try {
     const { title, content, images, group, location } = req.body;
@@ -80,7 +77,6 @@ exports.createPost = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// GET /api/posts (supports groupBy=day|author|group)
 exports.listPosts = async (req, res, next) => {
   try {
     const { groupBy, sort = 'latest' } = req.query;
@@ -101,7 +97,6 @@ exports.listPosts = async (req, res, next) => {
         Post.countDocuments(match),
       ]);
 
-      // הזרקת מונים + userLiked והסרת מערכים כבדים
       const shaped = items.map(p => {
         const likesCount = Array.isArray(p.likes) ? p.likes.length : 0;
         const commentsCount = Array.isArray(p.comments) ? p.comments.length : 0;
@@ -115,7 +110,6 @@ exports.listPosts = async (req, res, next) => {
       return res.json({ items: shaped, total, page, pages, limit });
     }
 
-    // === Grouped ===
     let groupIdExpr;
     if (groupBy === 'day') {
       groupIdExpr = { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } };
@@ -177,7 +171,6 @@ exports.listPosts = async (req, res, next) => {
                 images: '$$it.images',
                 createdAt: '$$it.createdAt',
                 updatedAt: '$$it.updatedAt',
-                // נשאיר likes/comments כדי לחשב מונים בצד JS ואז נסיר
                 likes: '$$it.likes',
                 comments: '$$it.comments',
                 author: {
@@ -213,7 +206,6 @@ exports.listPosts = async (req, res, next) => {
     const total = countArr?.[0]?.total || 0;
     const pages = Math.max(1, Math.ceil(total / limit));
 
-    // חשב מונים וחיתוך likes/comments מהפריטים
     const shapedGroups = groups.map(g => ({
       key: g.groupKey ?? g._id,
       count: g.count,
@@ -283,8 +275,6 @@ exports.deletePost = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ===== Likes =====
-// POST /api/posts/:id/like  (toggle)
 exports.toggleLike = async (req, res, next) => {
   try {
     if (!req.session?.userId) return res.status(401).json({ msg: 'Unauthorized' });
@@ -308,8 +298,6 @@ exports.toggleLike = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ===== Comments =====
-// GET /api/posts/:id/comments
 exports.listComments = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -318,7 +306,6 @@ exports.listComments = async (req, res, next) => {
       .populate('comments.user', 'username');
     if (!p) return res.status(404).json({ msg: 'Post not found' });
 
-    // ממיינים מהחדש לישן
     const comments = [...(p.comments || [])]
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .map(c => ({
@@ -332,7 +319,6 @@ exports.listComments = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// POST /api/posts/:id/comments
 exports.addComment = async (req, res, next) => {
   try {
     if (!req.session?.userId) return res.status(401).json({ msg: 'Unauthorized' });
@@ -347,7 +333,6 @@ exports.addComment = async (req, res, next) => {
     p.comments.push(newComment);
     await p.save();
 
-    // שליפה עם יוזר לשם
     const created = p.comments[p.comments.length - 1];
     await p.populate({ path: 'comments.user', select: 'username' });
 
@@ -362,7 +347,6 @@ exports.addComment = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// DELETE /api/posts/:postId/comments/:commentId
 exports.deleteComment = async (req, res, next) => {
   try {
     if (!req.session?.userId) return res.status(401).json({ msg: 'Unauthorized' });
@@ -385,8 +369,6 @@ exports.deleteComment = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ===== Preview (פופ-אפ) =====
-// GET /api/posts/:id/preview
 exports.getPreview = async (req, res, next) => {
   try {
     const { id } = req.params;

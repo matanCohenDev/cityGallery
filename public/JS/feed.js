@@ -1,9 +1,6 @@
-// public/JS/feed.js
 
-// ===== tiny helpers =====
 const $  = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
-// ===== joinable sidebar refs =====
 const joinableEl = $('#joinable');
 const joinableListEl = $('#joinableList');
 
@@ -31,7 +28,6 @@ async function api(path, method = 'GET', body) {
   return data;
 }
 
-// ===== header user state =====
 let currentUser = null;
 
 async function loadUser() {
@@ -55,21 +51,18 @@ $('#logoutBtn')?.addEventListener('click', async () => {
   } catch (e) { alert('Logout error: ' + e.message); }
 });
 
-// ===== state & filters =====
 let page = 1;
-let pages = 1;             // server-reported pages (if any)
+let pages = 1;             
 let loading = false;
 let lastQueryKey = '';
 
-const PAGE_SIZE = 50;      // fetch more per request to speed up "load all"
+const PAGE_SIZE = 50;      
 const dayEl = $('#day');
 
-// helper: exact local day range (no UTC misparse)
 const parseYMD = (s) => { const [y,m,d] = s.split('-').map(Number); return { y, m:m-1, d }; };
 const startOfDayLocal = (s) => { const {y,m,d}=parseYMD(s); return new Date(y,m,d,0,0,0,0).getTime(); };
 const endOfDayLocal   = (s) => { const {y,m,d}=parseYMD(s); return new Date(y,m,d,23,59,59,999).getTime(); };
 
-// initialize day with EMPTY (show all by default)
 (function initDay() {
   if (dayEl) dayEl.value = '';
 })();
@@ -106,7 +99,6 @@ function queryKey() {
   });
 }
 
-// ===== local filters =====
 function applyLocalFilters(items){
   const imagesOnly = $('#imagesOnly')?.checked || false;
   const dayStr = $('#day')?.value || '';
@@ -137,7 +129,6 @@ function applyLocalFilters(items){
   });
 }
 
-// ===== render =====
 function skeleton(count = 3) {
   const list = $('#feedList');
   list.innerHTML = '';
@@ -215,14 +206,12 @@ function makePostCard(p) {
     ${makeActionsBar(p)}
   `;
 
-  // wire events
   li.querySelector('.icon-like')?.addEventListener('click', onToggleLike);
   li.querySelector('.preview-btn')?.addEventListener('click', openPreviewFromBtn);
 
   return li;
 }
 
-// --- rendering (plain list) ---
 function renderItems(items, { append = false } = {}) {
   const list = $('#feedList');
   if (!append) list.innerHTML = '';
@@ -230,7 +219,6 @@ function renderItems(items, { append = false } = {}) {
   for (const p of items) list.appendChild(makePostCard(p));
 }
 
-// --- rendering (grouped) ---
 function makeGroupBlock(g, groupBy) {
   const wrap = document.createElement('li');
   wrap.className = 'group';
@@ -296,7 +284,6 @@ function renderJoinableList(groups){
   joinableListEl.innerHTML = groups.map(joinableItemHTML).join('');
   joinableEl.classList.remove('hidden');
 
-  // wire join buttons
   $$('.join-btn', joinableEl).forEach(btn => {
     btn.addEventListener('click', onJoinGroupClick);
   });
@@ -312,11 +299,9 @@ async function onJoinGroupClick(ev){
 
   try {
     await api(`/api/groups/${encodeURIComponent(id)}/join`, 'POST');
-    // הסר את הכרטיס מהרשימה
     const li = btn.closest('.joinable__item');
     if (li) li.remove();
 
-    // אם התרוקן — הסתר את ה־aside
     if (joinableListEl.children.length === 0) {
       joinableEl.classList.add('hidden');
     }
@@ -327,9 +312,6 @@ async function onJoinGroupClick(ev){
   }
 }
 
-
-// ===== data load (feed) =====
-// Original paged loader (kept for reference / infinite scroll)
 async function loadPosts({ append = false } = {}) {
   if (loading) return;
   loading = true;
@@ -366,7 +348,6 @@ async function loadPosts({ append = false } = {}) {
   }
 }
 
-// New: load ALL pages up-front so the feed shows everything in DB
 async function loadAllPages() {
   if (loading) return;
   loading = true;
@@ -378,12 +359,6 @@ async function loadAllPages() {
   try {
     page = 1;
     let append = false;
-
-    // Loop until no more data (supports various backend paging styles)
-    // Break conditions:
-    // - explicit pages count
-    // - hasMore flag
-    // - returned item count < limit
     while (true) {
       const params = buildParams();
       const data = await api('/api/posts?' + params.toString());
@@ -413,10 +388,9 @@ async function loadAllPages() {
 
       append = true;
       page++;
-      if (page > 500) break; // hard safety cap
+      if (page > 500) break; 
     }
 
-    // After full load, prevent infinite scroll from triggering
     pages = 1;
   } catch (e) {
     console.error(e);
@@ -427,9 +401,7 @@ async function loadAllPages() {
   }
 }
 
-// ===== joinable sidebar: data load =====
 async function loadJoinableGroups(){
-  // דורש משתמש מחובר (ה־route מוגן)
   if (!currentUser) {
     if (joinableEl) joinableEl.classList.add('hidden');
     return;
@@ -438,15 +410,12 @@ async function loadJoinableGroups(){
     const groups = await api('/api/groups/joinable?limit=50');
     renderJoinableList(groups);
   } catch (e) {
-    // אם לא מורשה או שגיאה — אל תפיל את הפיד
     if (joinableEl) joinableEl.classList.add('hidden');
     console.warn('joinable load error:', e?.message || e);
   }
 }
 
 
-// ===== infinite scroll =====
-// (Kept, but effectively disabled after loadAllPages sets pages=1)
 function nearBottom() {
   const pxFromBottom = document.documentElement.scrollHeight - (window.scrollY + window.innerHeight);
   return pxFromBottom < 300;
@@ -458,13 +427,11 @@ window.addEventListener('scroll', async () => {
   }
 });
 
-// ===== live filters (feed) =====
 function requery() {
   const newKey = queryKey();
   if (newKey !== lastQueryKey) {
     lastQueryKey = newKey;
     page = 1;
-    // When filters change, reload EVERYTHING so results are complete
     loadAllPages();
   }
 }
@@ -475,7 +442,6 @@ $('#day')?.addEventListener('change', requery);
 $('#groupBy')?.addEventListener('change', requery);
 $('#itemsPerGroup')?.addEventListener('change', requery);
 
-// ===== modal: create post =====
 const modal = $('#modal');
 function lockScroll(yes) { document.body.style.overflow = yes ? 'hidden' : ''; }
 function openModal() { if (!modal) return; modal.classList.remove('hidden'); lockScroll(true); }
@@ -488,7 +454,6 @@ $('#cancelPost')?.addEventListener('click', closeModal);
 modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal?.classList.contains('hidden')) closeModal(); });
 
-// image preview (local)
 const imageFileEl = document.querySelector('input[name="imageFile"]');
 const previewBox = $('#imagePreview');
 
@@ -500,7 +465,6 @@ imageFileEl?.addEventListener('change', () => {
   previewBox.classList.remove('hidden');
 });
 
-// upload helper
 async function uploadImage(file) {
   const fd = new FormData();
   fd.append('image', file);
@@ -509,7 +473,7 @@ async function uploadImage(file) {
     const txt = await res.text().catch(()=> '');
     throw new Error(`Upload failed (${res.status}): ${txt || res.statusText}`);
   }
-  return await res.json(); // { url }
+  return await res.json(); 
 }
 
 function clearFormFields(form){
@@ -555,18 +519,15 @@ $('#postForm')?.addEventListener('submit', async (e) => {
   }
 });
 
-// ======= Likes =======
 async function onToggleLike(ev) {
   if (!currentUser) { alert('Please sign in to like'); return; }
   const btn = ev.currentTarget.closest('.icon-like');
   const id = btn?.dataset?.id;
   if (!id) return;
 
-  // current state
   const liked = btn.classList.contains('liked');
   const countEl = btn.querySelector('.like-count');
 
-  // optimistic UI
   btn.classList.toggle('liked');
   if (countEl) {
     const curr = parseInt(countEl.textContent || '0', 10) || 0;
@@ -577,13 +538,11 @@ async function onToggleLike(ev) {
     const res = await api(`/api/posts/${encodeURIComponent(id)}/like`, 'POST');
     if (countEl) countEl.textContent = String(res.likesCount ?? 0);
     btn.classList.toggle('liked', !!res.liked);
-    // also update in preview modal if same post open
     if (previewState.postId === id) {
       const pvLike = $('#pv-like-count'); if (pvLike) pvLike.textContent = String(res.likesCount ?? 0);
       const pvHeart = $('#pv-like-btn');  if (pvHeart) pvHeart.classList.toggle('liked', !!res.liked);
     }
   } catch (e) {
-    // revert optimistic on error
     btn.classList.toggle('liked');
     if (countEl) {
       const curr = parseInt(countEl.textContent || '0', 10) || 0;
@@ -593,7 +552,6 @@ async function onToggleLike(ev) {
   }
 }
 
-// ======= Preview & Comments =======
 const previewModal = $('#previewModal');
 const closePreviewBtn = $('#closePreview');
 const previewBoxEl = $('#previewContent');
@@ -658,15 +616,12 @@ async function loadPreview(id){
       </article>
     `;
 
-    // wire preview like
     $('#pv-like-btn')?.addEventListener('click', onToggleLike);
 
-    // render comments
     const list = $('#pv-comments-list');
     list.innerHTML = '';
     (p.comments || []).forEach(c => list.appendChild(renderCommentItem(c)));
 
-    // add comment
     $('#pv-comment-form')?.addEventListener('submit', onAddComment);
 
     openPreview();
@@ -701,13 +656,10 @@ async function onAddComment(ev) {
 
   try {
     const res = await api(`/api/posts/${encodeURIComponent(id)}/comments`, 'POST', { text });
-    // prepend new comment
     const list = $('#pv-comments-list');
     list.prepend(renderCommentItem(res));
     ta.value = '';
-    // update counts in modal
     $('#pv-comment-count').textContent = String(res.commentsCount ?? (parseInt($('#pv-comment-count').textContent||'0',10)+1));
-    // update comment count on card if exists
     const btn = document.querySelector(`.preview-btn[data-id="${CSS.escape(id)}"]`);
     const span = btn?.querySelector('.comment-count');
     if (span) span.textContent = String(res.commentsCount ?? parseInt(span.textContent||'0',10)+1);
@@ -718,11 +670,10 @@ async function onAddComment(ev) {
 
 (async function init() {
   await loadUser();
-  await loadJoinableGroups();   // 👈 החזרה של ה־sidebar
+  await loadJoinableGroups();  
   if (dayEl) dayEl.value = '';
   lastQueryKey = queryKey();
   await loadAllPages();
 
-  // אופציונלי: כפתור יצירה במסך הריק יפתח מודל
   $('#emptyNewPost')?.addEventListener('click', openModal);
 })();

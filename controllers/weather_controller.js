@@ -1,13 +1,12 @@
-const fetch = require('node-fetch'); // npm i node-fetch@2
-const Branch = require('../models/galleryBranches_model'); // לפי שם הסכמה שלך
+const fetch = require('node-fetch');
+const Branch = require('../models/galleryBranches_model');
 const OWM_KEY = process.env.OWM_API_KEY;
 
-const cache = new Map(); // קאש בזיכרון: key -> { data, ts }
-const TTL_MS = 10 * 60 * 1000; // 10 דקות
+const cache = new Map(); 
+const TTL_MS = 10 * 60 * 1000; 
 
-// המלצה לפי טמפ' וגשם/רוח
 function visitAdvice({ tempC, weatherMain, wind }) {
-  const windy = wind && wind > 9; // >9 m/s = רוח מורגשת
+  const windy = wind && wind > 9; 
   const rainy = /rain|drizzle|thunderstorm/i.test(weatherMain || '');
 
   if (rainy) return { label: 'גשום — עדיף לבדוק שעות פתיחה ולהביא מטריה ☔', tone: 'warn' };
@@ -23,10 +22,8 @@ exports.getBranchesWeather = async (req, res, next) => {
   try {
     if (!OWM_KEY) return res.status(500).json({ msg: 'Missing OWM_API_KEY' });
 
-    // משיכת סניפים מה־DB
     const branches = await Branch.find({}, { name: 1, city: 1, country: 1, 'location.lat': 1, 'location.lng': 1 }).lean();
 
-    // נבנה רשימת בקשות לפי lat/lng
     const jobs = branches
       .filter(b => b?.location?.lat != null && b?.location?.lng != null)
       .map(b => ({
@@ -38,7 +35,6 @@ exports.getBranchesWeather = async (req, res, next) => {
         lon: b.location.lng
       }));
 
-    // קאש פר פרמטר קואורדינטות (עיגול ל־2 ספרות כדי לא לקבל קאש יתר על סניפים שכנים)
     const now = Date.now();
     const fetchOne = async (job) => {
       const key = `${job.lat.toFixed(2)},${job.lon.toFixed(2)}`;

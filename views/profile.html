@@ -9,7 +9,6 @@
   <link rel="stylesheet" href="/CSS/profile.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    /* תוספות קלות ל-UI של קבוצות (נשען על ה-design הקיים) */
     .groups-grid{ list-style:none;margin:0;padding:0;display:grid;gap:20px;grid-template-columns:repeat(12,1fr) }
     .groups-grid .card{ grid-column:span 6; display:flex;gap:16px;align-items:center; padding:20px; }
     .group__meta{ display:grid; gap:6px; flex:1; padding:12px 0 }
@@ -18,18 +17,15 @@
     .pill{ display:inline-block; padding:6px 12px; border-radius:999px; border:1px solid var(--line); background:#fff; font-size:.9rem; color:#475569; font-weight:600; }
     @media (max-width:860px){ .groups-grid .card{ grid-column:span 12 } }
 
-    /* כפתורי Post */
     .btn-danger{background:var(--danger);color:#fff;border:0;font-weight:700}
     .btn-danger:hover{filter:brightness(1.1);transform:translateY(-1px)}
 
-    /* מודאל יצירת קבוצה */
     .modal .hint{ color:#64748b; font-size:.9rem }
     .modal .row{ display:grid; gap:10px; grid-template-columns:1fr 1fr }
     @media (max-width:640px){ .modal .row{ grid-template-columns:1fr } }
   </style>
 </head>
 <body>
-  <!-- Header -->
   <header class="header">
     <div class="container nav">
       <a class="brand" href="/">
@@ -51,7 +47,6 @@
     </div>
   </header>
 
-  <!-- Profile header -->
   <section class="profile-hero">
     <div class="container hero__row">
       <div class="avatar xl" id="avatarHero" aria-hidden="true">👤</div>
@@ -63,10 +58,8 @@
     </div>
   </section>
 
-  <!-- Main -->
   <main class="container profile-main">
 
-    <!-- Groups (NEW) -->
     <section class="profile-section" id="sectionGroups">
       <div class="section-head">
         <h2>👥 My Groups</h2>
@@ -81,7 +74,6 @@
       </div>
 
       <div class="profile-section">
-      <!-- גריד קבוצות: 4 בשורה -->
       <ul id="gridMyGroups" class="groups-grid4" aria-live="polite"></ul>
         <div id="emptyMemberGroups" class="empty hidden">
           <div class="empty__card">
@@ -94,7 +86,6 @@
       </div>
     </section>
 
-    <!-- With images -->
     <section class="profile-section" id="sectionWith">
       <div class="section-head">
         <h2>📸 Photo Posts<span class="count" id="countWith">(0)</span></h2>
@@ -110,7 +101,6 @@
       </div>
     </section>
 
-    <!-- Without images -->
     <section class="profile-section" id="sectionNo">
       <div class="section-head">
         <h2>💭 Text Posts<span class="count" id="countNo">(0)</span></h2>
@@ -127,7 +117,6 @@
     </section>
   </main>
 
-  <!-- Create Post Modal -->
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal__card" role="document">
       <div class="modal__header">
@@ -161,7 +150,6 @@
     </div>
   </div>
 
-  <!-- Quick view modal -->
   <div id="viewModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="viewTitle">
     <div class="modal__card view-modal" role="document">
       <div class="modal__header">
@@ -172,7 +160,6 @@
     </div>
   </div>
 
-  <!-- Settings Modal -->
   <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
     <div class="modal__card" role="document">
       <div class="modal__header">
@@ -213,7 +200,6 @@
     </div>
   </div>
 
-  <!-- Edit post modal -->
   <div id="editModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="editTitle">
     <div class="modal__card view-modal" role="document">
       <div class="modal__header">
@@ -250,7 +236,6 @@
     </div>
   </div>
 
-  <!-- Create Group modal (NEW) -->
   <div id="groupModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="groupTitle">
     <div class="modal__card" role="document">
       <div class="modal__header">
@@ -283,7 +268,6 @@
     </div>
   </div>
 
-  <!-- Preview Modal (NEW) -->
   <div id="previewModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
     <div class="modal__card" role="document">
       <div class="modal__header">
@@ -294,10 +278,8 @@
     </div>
   </div>
 
-  <!-- Toast -->
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
   
-  <!-- Members Modal (NEW) -->
   <div id="membersModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="membersTitle">
     <div class="modal__card" role="document">
       <div class="modal__header">

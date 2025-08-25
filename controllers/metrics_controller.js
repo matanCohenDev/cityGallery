@@ -1,16 +1,14 @@
-// controllers/metrics_controller.js
-const Post  = require('../models/posts_model');   // קיים אצלך (routes/posts_routes)
+const Post  = require('../models/posts_model');   
 const Group = require('../models/groups_model');
-const User  = require('../models/users_model');   // לא חובה לגרפים האלו, אבל נשאיר להרחבות
+const User  = require('../models/users_model');  
 
 exports.landingMetrics = async (req, res, next) => {
   try {
     const now = new Date();
     const from = new Date(now);
     from.setHours(0,0,0,0);
-    from.setDate(from.getDate() - 13); // כולל היום => 14 ימים
+    from.setDate(from.getDate() - 13); 
 
-    // Posts per day (14 days)
     const postsAgg = await Post.aggregate([
       { $match: { createdAt: { $gte: from } } },
       {
@@ -23,7 +21,6 @@ exports.landingMetrics = async (req, res, next) => {
       { $sort: { date: 1 } }
     ]);
 
-    // Top 5 groups by members count
     const groupsAgg = await Group.aggregate([
       { $project: {
           name: '$name',
@@ -34,8 +31,8 @@ exports.landingMetrics = async (req, res, next) => {
     ]);
 
     res.json({
-      postsLast14: postsAgg,     // [{date:'2025-08-12', count: 7}, ...]
-      topGroups: groupsAgg       // [{name:'Group A', membersCount: 12}, ...]
+      postsLast14: postsAgg,
+      topGroups: groupsAgg
     });
   } catch (err) { next(err); }
 };

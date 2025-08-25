@@ -1,6 +1,5 @@
 const Branch = require('../models/galleryBranches_model');
 
-// POST /api/branches
 exports.createBranch = async (req, res, next) => {
   try {
     const { name, address, coordinates } = req.body;
@@ -11,7 +10,6 @@ exports.createBranch = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// GET /api/branches
 exports.listBranches = async (req, res, next) => {
   try {
     const { q } = req.query;
@@ -24,7 +22,6 @@ exports.listBranches = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// GET /api/branches/:id
 exports.getBranch = async (req, res, next) => {
   try {
     const b = await Branch.findById(req.params.id);
@@ -33,7 +30,6 @@ exports.getBranch = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// PATCH /api/branches/:id
 exports.updateBranch = async (req, res, next) => {
   try {
     const { name, address, coordinates } = req.body;
@@ -43,7 +39,6 @@ exports.updateBranch = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// DELETE /api/branches/:id
 exports.deleteBranch = async (req, res, next) => {
   try {
     const b = await Branch.findByIdAndDelete(req.params.id);
