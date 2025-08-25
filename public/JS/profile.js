@@ -1,698 +1,911 @@
-// =====================
-// CityGallery — Profile (Full)
-// =====================
-
-/* ---------- tiny helpers ---------- */
+// ===== tiny helpers =====
 const $  = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
-const htmlEscape = (s)=> String(s ?? '').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function fmtExact(iso){ const d=new Date(iso); return d.toLocaleString([], {year:'numeric',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'}); }
-let LAST_UPLOADED_GROUP_COVER_URL = null;
 
-/* ---------- API ---------- */
-async function api(path, method='GET', body){
-  const isForm = body instanceof FormData;
-  const headers = isForm ? {} : { 'Content-Type': 'application/json' };
-  const res = await fetch(path, { method, headers, body: isForm ? body : (body ? JSON.stringify(body) : undefined), credentials:'include' });
-  let data = {};
-  const text = await res.text(); try{ data = JSON.parse(text) } catch { data = {} }
+function fmtExact(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString([], {
+    year: 'numeric', month: 'short', day: '2-digit',
+    hour: '2-digit', minute: '2-digit'
+  });
+}
+
+// unified JSON fetch
+async function fetchJSON(path, method='GET', body) {
+  const res = await fetch(path, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+    credentials: 'include'
+  });
+  const text = await res.text();
+  let data; try { data = text ? JSON.parse(text) : {}; } catch { data = {}; }
+  return { res, data };
+}
+
+// basic api (single attempt)
+async function api(path, method='GET', body) {
+  const { res, data } = await fetchJSON(path, method, body);
   if (!res.ok) throw new Error(data.message || data.msg || res.statusText);
   return data;
 }
 
-function toImageUrl(u){
-  if(!u) return '';
-  if (/^https?:\/\//i.test(u) || u.startsWith('data:') || u.startsWith('blob:') || u.startsWith('/uploads/')) return u;
-  // נרמול מחרוזות כמו "uploads/abc.jpg"
-  u = String(u).replace(/^\.?\/?uploads[\\/]/i, '');
-  return `/uploads/${u}`;
-}
-
-function getGroupCoverRaw(g){
-  const candidate =
-    g?.coverImage ??
-    g?.cover ??
-    g?.avatar ??
-    g?.image ??
-    g?.photo ??
-    (typeof g?.cover === 'object' ? (g.cover.url || g.cover.src) : undefined) ??
-    (Array.isArray(g?.images) ? g.images[0] : undefined) ??
-    '';
-  if (candidate && typeof candidate === 'object') {
-    return candidate.url || candidate.src || '';
-  }
-  return candidate || '';
-}
-
-function getGroupCoverUrl(g){
-  const raw = getGroupCoverRaw(g);
-  return raw ? toImageUrl(raw) : '';
-}
-
-function initialsFromName(name='Group'){
-  const parts = String(name).trim().split(/\s+/).slice(0,2);
-  return parts.map(p => p[0]?.toUpperCase() || '').join('') || 'GR';
-}
-
-function avatarFallbackHtml(name){
-  const ini = initialsFromName(name);
-  return `<div class="avatar-fallback" aria-hidden="true">${ini}</div>`;
-}
-
-/* ---------- Toast ---------- */
-const toastEl = $('#toast');
-function showToast(msg, type='ok'){
-  if (!toastEl) return; toastEl.textContent=msg;
-  toastEl.classList.remove('hidden','ok','error'); toastEl.classList.add(type);
-  setTimeout(()=> toastEl.classList.add('hidden'), 2200);
-}
-
-async function deleteGroupById(groupId){
-  await api(`/api/groups/${encodeURIComponent(groupId)}`, 'DELETE');
-  showToast('Group deleted ✔','ok');
-  return true;
-}
-
-/* ---------- User header ---------- */
-let CURRENT_USER = null;
-async function loadUser(){
-  try{
-    const me = await api('/api/users/me');
-    CURRENT_USER = me || null;
-    const username = me?.username || me?.user?.username || 'User';
-    const bio = me?.bio || 'Your posts and stats';
-    $('#userBadge')?.replaceChildren(document.createTextNode(`Signed in as ${username}`));
-    $('#profileName')?.replaceChildren(document.createTextNode(username));
-    $('#profileSubtitle')?.replaceChildren(document.createTextNode(bio));
-    return me;
-  }catch{
-    $('#userBadge')?.replaceChildren(document.createTextNode('Not signed in'));
-    CURRENT_USER=null; return null;
-  }
-}
-$('#logoutBtn')?.addEventListener('click', async ()=>{ try{ await api('/api/users/logout','POST') } finally { location.href='/' }});
-
-/* ---------- State ---------- */
-let page=1, pages=1, loading=false, cache=[], mine=[];
-function hasImage(p){ const imgs=Array.isArray(p.images)?p.images:[]; return imgs.some(u=> typeof u==='string' && u.trim().length); }
-function isMine(post, me){
-  if (!me || !post) return false;
-  const meId = me._id || me.id || me.user?._id || me.user?.id || null;
-  const a = post.author || {}; const aId = a._id || a.id || null;
-  if (meId && aId && String(meId)===String(aId)) return true;
-  const meUsername = me.username || me.user?.username || null;
-  if (meUsername && a.username && String(meUsername)===String(a.username)) return true;
-  const meEmail = me.email || me.user?.email || null;
-  return !!(meEmail && a.email && String(meEmail)===String(a.email));
-}
-
-/* ---------- Skeletons ---------- */
-function skeletonGrid(targetUl, n=6){
-  const ul=$(targetUl); if(!ul) return; ul.innerHTML='';
-  for(let i=0;i<n;i++){ const li=document.createElement('li'); li.className='card skeleton';
-    li.innerHTML = `
-      <div class="card__media skel"></div>
-      <div class="card__body">
-        <div class="line skel" style="width:70%"></div>
-        <div class="line skel" style="width:40%"></div>
-      </div>
-      <div class="card__actions">
-        <button class="btn" disabled>Preview</button>
-        <button class="btn" disabled>Edit</button>
-      </div>`;
-    ul.appendChild(li);
-  }
-}
-
-/* ---------- Render posts ---------- */
-function cardTemplate(p){
-  const title = htmlEscape(p.title || '');
-  const when  = p.createdAt ? fmtExact(p.createdAt) : '';
-  const img   = hasImage(p) ? toImageUrl(p.images[0]) : null;
-
-  const li = document.createElement('li');
-  li.className = 'card' + (img ? '' : ' card--noimg');
-  li.innerHTML = `
-    <a class="card__media" href="${img || '#'}" ${img ? 'target="_blank" rel="noopener"' : ''}>
-      ${img ? `<img src="${img}" alt="">` : ''}
-    </a>
-    <div class="card__body">
-      <h3 class="card__title">${title || '(No title)'}</h3>
-      <div class="card__meta">
-        <span>${when}</span>
-        <span>${(p.status || 'published')}</span>
-      </div>
-    </div>
-    <div class="card__actions">
-      <button class="btn" data-action="preview">Preview</button>
-      <button class="btn" data-action="edit">Edit</button>
-      <button class="btn btn-danger" data-action="delete">Delete</button>
-    </div>
-  `;
-
-  li.querySelector('[data-action="preview"]')?.addEventListener('click', (e)=>{ e.preventDefault(); openPreview(p); });
-  li.querySelector('[data-action="edit"]')?.addEventListener('click', (e)=>{ e.preventDefault(); openEdit(p); });
-  li.querySelector('[data-action="delete"]')?.addEventListener('click', async (e)=>{
-    e.preventDefault();
-    try{
-      await api(`/api/posts/${p._id || p.id}`, 'DELETE');
-      showToast('Post deleted ✔','ok');
-      page=1; pages=1; cache=[]; mine=[]; await loadMine();
-    }catch(err){ showToast(err.message || 'Failed to delete','error') }
-  });
-
-  return li;
-}
-function renderGridTo(ulSelector, items){
-  const ul=$(ulSelector); if(!ul) return; ul.innerHTML=''; for(const p of items) ul.appendChild(cardTemplate(p));
-}
-function renderTwoGrids(filtered){
-  const withArr=filtered.filter(hasImage); const noArr=filtered.filter(p=>!hasImage(p));
-  renderGridTo('#gridWith', withArr); renderGridTo('#gridNo', noArr);
-  $('#emptyWith')?.classList.toggle('hidden', withArr.length!==0);
-  $('#emptyNo')?.classList.toggle('hidden',  noArr.length!==0);
-  $('#countWith')?.replaceChildren(document.createTextNode(`(${withArr.length})`));
-  $('#countNo')?.replaceChildren(document.createTextNode(`(${noArr.length})`));
-}
-
-/* ---------- Quick view modal ---------- */
-const viewModal=$('#viewModal'), viewBody=$('#viewBody');
-function lockScroll(yes){ document.body.style.overflow = yes ? 'hidden' : '' }
-function openView(){ viewModal?.classList.remove('hidden'); lockScroll(true) }
-function closeView(){ viewModal?.classList.add('hidden');  lockScroll(false) }
-$('#closeView')?.addEventListener('click', closeView);
-viewModal?.addEventListener('click', (e)=>{ if(e.target===viewModal) closeView() });
-document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && !viewModal?.classList.contains('hidden')) closeView() });
-function openPreview(p){
-  $('#viewTitle')?.replaceChildren(document.createTextNode(p.title || 'Post'));
-  const img = hasImage(p) ? `<img class="view-cover" src="${toImageUrl(p.images[0])}" alt="">` : '';
-  if(viewBody){ viewBody.innerHTML = `${img}<div><div class="muted" style="margin-bottom:6px">${fmtExact(p.createdAt||Date.now())}</div><h3 style="margin:.2em 0">${htmlEscape(p.title||'(No title)')}</h3><p style="margin:.4em 0; white-space:pre-wrap">${htmlEscape(p.content||'')}</p></div>`}
-  openView();
-}
-
-/* ---------- Filters & stats ---------- */
-function currentQuery(){ return { q: ($('#q')?.value||'').trim().toLowerCase(), imagesOnly: !!$('#imagesOnly')?.checked, sort: $('#sort')?.value || 'new' } }
-function applyLocal(items){
-  const {q,sort}=currentQuery();
-  let out = items.filter(p=>{ if(q){ const hay=`${p.title??''} ${p.content??''}`.toLowerCase(); if(!hay.includes(q)) return false } return true });
-  if (sort==='new') out.sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
-  else if (sort==='old') out.sort((a,b)=> new Date(a.createdAt)-new Date(b.createdAt));
-  else if (sort==='title') out.sort((a,b)=> (a.title||'').localeCompare(b.title||''));
-  return out;
-}
-function syncNoSectionVisibility(){ const only=!!$('#imagesOnly')?.checked; $('#sectionNo')?.classList.toggle('hidden', only) }
-function updateStats(all, filtered){
-  const total=all.length, withImgAll=all.filter(hasImage).length, withImgFiltered=filtered.filter(hasImage).length, noImgFiltered=filtered.length-withImgFiltered;
-  $('#heroStats')?.replaceChildren(...[`Total: ${total}`,`Posts: ${withImgAll}`,`Statuses: ${noImgFiltered}`].map(t=>{ const s=document.createElement('span'); s.className='stat-pill'; s.textContent=t; return s; }));
-}
-function refreshGrids(){ const filtered=applyLocal(mine); renderTwoGrids(filtered); updateStats(mine,filtered); syncNoSectionVisibility(); }
-
-/* ---------- Data load (my posts) ---------- */
-async function loadMine({append=false}={}){
-  if(loading) return; loading=true;
-  if(!append){ skeletonGrid('#gridWith',6); skeletonGrid('#gridNo',4) }
-  try{
-    const params=new URLSearchParams(); params.set('mine','true'); params.set('page',String(page)); params.set('limit','24');
-    const data=await api('/api/posts?'+params.toString());
-    pages = Array.isArray(data) ? 1 : (data.pages || 1);
-    const items = Array.isArray(data) ? data : (data.items || []);
-    if(!append) cache=[]; cache=cache.concat(items);
-    mine = cache.filter(p=> isMine(p, CURRENT_USER));
-    refreshGrids();
-  }catch(e){
-    console.error(e);
-    if(!append){ $('#gridWith') && ($('#gridWith').innerHTML=''); $('#gridNo') && ($('#gridNo').innerHTML=''); $('#emptyWith')?.classList.remove('hidden'); $('#emptyNo')?.classList.remove('hidden'); }
-  }finally{ loading=false }
-}
-function nearBottom(){ const px=document.documentElement.scrollHeight-(window.scrollY+window.innerHeight); return px<300 }
-window.addEventListener('scroll', async ()=>{ if(nearBottom() && !loading && page<pages){ page++; await loadMine({append:true}) }});
-$('#q')?.addEventListener('input', refreshGrids); $('#imagesOnly')?.addEventListener('change', refreshGrids); $('#sort')?.addEventListener('change', refreshGrids);
-
-/* ---------- Create post modal ---------- */
-const modal=$('#modal');
-function openModal(){ modal?.classList.remove('hidden'); lockScroll(true) }
-function closeModal(){ modal?.classList.add('hidden');   lockScroll(false) }
-$('#newPostBtn')?.addEventListener('click', openModal);
-$('#emptyNewPost1')?.addEventListener('click', openModal);
-$('#emptyNewPost2')?.addEventListener('click', openModal);
-$('#closeModal')?.addEventListener('click', closeModal);
-$('#cancelPost')?.addEventListener('click', closeModal);
-modal?.addEventListener('click',(e)=>{ if(e.target===modal) closeModal() });
-document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && !modal?.classList.contains('hidden')) closeModal() });
-
-const imageFileEl=document.querySelector('input[name="imageFile"]'); const previewBox=$('#imagePreview');
-imageFileEl?.addEventListener('change',()=>{ const f=imageFileEl.files?.[0]; if(!f){ previewBox?.classList.add('hidden'); if(previewBox) previewBox.innerHTML=''; return } const url=URL.createObjectURL(f); if(previewBox){ previewBox.innerHTML=`<img src="${url}" alt="preview"><small class="muted">${f.name} • ${(f.size/1024).toFixed(1)} KB</small>`; previewBox.classList.remove('hidden') }});
-async function uploadImage(file){ const fd=new FormData(); fd.append('image',file); const res=await fetch('/api/uploads',{method:'POST',body:fd,credentials:'include'}); if(!res.ok){ const txt=await res.text().catch(()=> ''); throw new Error(`Upload failed (${res.status}): ${txt || res.statusText}`)} return await res.json() }
-function clearFormFields(form){ form.reset(); if(previewBox){ previewBox.classList.add('hidden'); previewBox.innerHTML='' } }
-$('#clearForm')?.addEventListener('click',()=>{ const f=$('#postForm'); if(f) clearFormFields(f) });
-$('#postForm')?.addEventListener('submit', async (e)=>{
-  e.preventDefault(); const f=e.target;
-  const title=f.title.value.trim(); const content=f.content.value.trim();
-  if(!title || !content) return showToast('Please fill title and content','error');
-  try{
-    const payload={ title, content, status:'published' };
-    const imgFile=f.imageFile?.files?.[0];
-    if(imgFile){ const {url}=await uploadImage(imgFile); if(url) payload.images=[url] }
-    await api('/api/posts','POST',payload);
-    closeModal(); clearFormFields(f); page=1; pages=1; cache=[]; mine=[]; await loadMine(); window.scrollTo({top:0,behavior:'smooth'}); showToast('Post published ✔','ok');
-  }catch(err){ showToast('Create post error: '+err.message,'error') }
-});
-
-/* ---------- Settings ---------- */
-const settingsModal=$('#settingsModal'), settingsForm=$('#settingsForm');
-$('#openSettings')?.addEventListener('click',(e)=>{ e.preventDefault(); openSettings() });
-$('#closeSettings')?.addEventListener('click', closeSettings);
-$('#cancelSettings')?.addEventListener('click', closeSettings);
-settingsModal?.addEventListener('click',(e)=>{ if(e.target===settingsModal) closeSettings() });
-document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && !settingsModal?.classList.contains('hidden')) closeSettings() });
-function openSettings(){ prefillSettings(); settingsModal?.classList.remove('hidden'); document.body.style.overflow='hidden' }
-function closeSettings(){ settingsModal?.classList.add('hidden'); document.body.style.overflow='' }
-async function prefillSettings(){ try{ const me=CURRENT_USER || await api('/api/users/me'); CURRENT_USER=me; settingsForm.username.value = me?.username || me?.user?.username || ''; settingsForm.email.value = me?.email || me?.user?.email || ''; settingsForm.currentPassword.value=''; settingsForm.newPassword.value=''; settingsForm.confirmPassword.value=''; }catch{} }
-async function tryProfileUpdate(body){
-  const endpoints=[{url:'/api/users/me',method:'PATCH'},{url:'/api/users/profile',method:'PATCH'},{url:'/api/users/update',method:'PUT'}];
-  for(const ep of endpoints){ try{ await api(ep.url, ep.method, body); return true }catch(e){ if(String(e.message).match(/^(400|404|405)/)) continue; throw e } }
-  throw new Error('Profile update endpoint not found');
-}
-async function tryPasswordChange(currentPassword, newPassword){
-  const options=[{url:'/api/users/change-password',method:'POST',body:{currentPassword,newPassword}},{url:'/api/users/me/password',method:'PATCH',body:{currentPassword,newPassword}},{url:'/api/users/password',method:'PUT',body:{currentPassword,newPassword}}];
-  for(const ep of options){ try{ await api(ep.url, ep.method, ep.body); return true }catch(e){ if(String(e.message).match(/^(400|404|405)/)) continue; throw e } }
-  throw new Error('Password change endpoint not found');
-}
-$('#saveSettings')?.addEventListener('click', (e)=>{ e.preventDefault(); settingsForm?.requestSubmit() });
-settingsForm?.addEventListener('submit', async (e)=>{
-  e.preventDefault();
-  const username=settingsForm.username.value.trim(); const email=settingsForm.email.value.trim();
-  const currentPassword=settingsForm.currentPassword.value; const newPassword=settingsForm.newPassword.value; const confirmPassword=settingsForm.confirmPassword.value;
-  if((newPassword || confirmPassword)){ if(newPassword.length<6) return showToast('Password must be at least 6 chars','error'); if(newPassword!==confirmPassword) return showToast('New passwords do not match','error'); if(!currentPassword) return showToast('Enter current password to change it','error'); }
-  if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showToast('Invalid email','error');
-  $('#saveSettings')?.setAttribute('disabled','disabled');
-  try{
-    const toUpdate={}; if(username) toUpdate.username=username; if(email) toUpdate.email=email;
-    if(Object.keys(toUpdate).length){ await tryProfileUpdate(toUpdate) }
-    if(newPassword){ await tryPasswordChange(currentPassword,newPassword) }
-    try{ const me=await api('/api/users/me'); CURRENT_USER=me; const un=me?.username||me?.user?.username||'User'; const bio=me?.bio||'Your posts and stats'; $('#userBadge')?.replaceChildren(document.createTextNode(`Signed in as ${un}`)); $('#profileName')?.replaceChildren(document.createTextNode(un)); $('#profileSubtitle')?.replaceChildren(document.createTextNode(bio)); }catch{}
-    showToast('Settings saved ✔','ok'); closeSettings();
-  }catch(err){ showToast(err.message || 'Failed to save settings','error') }
-  finally{ $('#saveSettings')?.removeAttribute('disabled') }
-});
-
-/* ---------- Edit post modal ---------- */
-const editModal=$('#editModal'), editForm=$('#editForm'), closeEditBtn=$('#closeEdit'), cancelEditBtn=$('#cancelEdit'), editPreviewBox=$('#editPreviewBox'), editImageInput=editForm?.querySelector('input[name="imageFile"]'), editImagePreview=$('#editImagePreview');
-let EDIT_POST_ID=null;
-function openEdit(p){
-  EDIT_POST_ID = p._id || p.id;
-  $('#editTitle')?.replaceChildren(document.createTextNode(`Edit: ${p.title || 'Post'}`));
-  editPreviewBox.innerHTML = hasImage(p) ? `<img class="view-cover" src="${toImageUrl(p.images[0])}" alt="">` : `<div class="muted">No image</div>`;
-  editForm.title.value = p.title || ''; editForm.content.value = p.content || ''; editForm.removeImage.checked=false;
-  if(editImagePreview){ editImagePreview.classList.add('hidden'); editImagePreview.innerHTML='' }
-  if(editImageInput) editImageInput.value='';
-  editModal?.classList.remove('hidden'); lockScroll(true);
-}
-function closeEdit(){ editModal?.classList.add('hidden'); lockScroll(false); EDIT_POST_ID=null }
-closeEditBtn?.addEventListener('click', closeEdit); cancelEditBtn?.addEventListener('click', closeEdit);
-editModal?.addEventListener('click',(e)=>{ if(e.target===editModal) closeEdit() });
-document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && !editModal?.classList.contains('hidden')) closeEdit() });
-editImageInput?.addEventListener('change', ()=>{ const f=editImageInput.files?.[0]; if(!f){ editImagePreview?.classList.add('hidden'); if(editImagePreview) editImagePreview.innerHTML=''; return } const url=URL.createObjectURL(f); if(editImagePreview){ editImagePreview.innerHTML=`<img src="${url}" alt="preview"><small class="muted">${f.name} • ${(f.size/1024).toFixed(1)} KB</small>`; editImagePreview.classList.remove('hidden') }});
-editForm?.addEventListener('submit', async (e)=>{
-  e.preventDefault(); if(!EDIT_POST_ID) return showToast('No post selected','error');
-  const title=editForm.title.value.trim(); const content=editForm.content.value.trim(); const removeImage=!!editForm.removeImage.checked;
-  if(!title || !content) return showToast('Title and text are required','error');
-  try{
-    const payload={ title, content }; const newFile=editImageInput?.files?.[0];
-    if(removeImage) payload.images=[]; else if(newFile){ const {url}=await uploadImage(newFile); if(url) payload.images=[url] }
-    await api(`/api/posts/${EDIT_POST_ID}`,'PATCH',payload);
-    closeEdit(); page=1; pages=1; cache=[]; mine=[]; await loadMine(); showToast('Post updated ✔','ok');
-  }catch(err){ showToast(err.message || 'Failed to update post','error') }
-});
-
-/* ---------- Groups: list + create ---------- */
-const gridAdminGroups = $('#gridAdminGroups');
-// חשוב: ב-HTML אין אלמנט עם id="gridMemberGroups", לכן נשתמש ב-#gridMyGroups
-const gridMemberGroups= $('#gridMyGroups');
-
-function groupCardTemplate(g){
-  const id    = g._id || g.id;
-  const name  = g.name || 'Group';
-  const desc  = g.description || '';
-  const coverUrl = getGroupCoverUrl(g);
-
-  // ← זה כל הקסם: קביעה האם המשתמש הנוכחי הוא הבעלים
-  const ownerId  = String(g.owner?._id || g.owner || '');
-  const meId     = String(CURRENT_USER?._id || CURRENT_USER?.id || '');
-  const isOwner  = ownerId && meId && ownerId === meId;
-
-  const li = document.createElement('li');
-  li.className = 'group-card';
-  li.innerHTML = `
-    <div class="group-card__head">
-      <a class="group-card__avatar" aria-label="${htmlEscape(name)}">
-        ${
-          coverUrl
-            ? `<img src="${coverUrl}" alt="${htmlEscape(name)}"
-                  loading="lazy"
-                  onerror="this.closest('.group-card__avatar').innerHTML=\`${avatarFallbackHtml(htmlEscape(name)).replace(/`/g,'\\`')}\`;"/>`
-            : `${avatarFallbackHtml(name)}`
-        }
-      </a>
-      <h4 class="group-card__name" title="${htmlEscape(name)}">${htmlEscape(name)}</h4>
-    </div>
-
-    <p class="group-card__desc">${htmlEscape(desc)}</p>
-
-    <div class="group-card__foot">
-      <div style="display:flex; gap:8px">
-        <button class="btn" data-action="members" data-id="${id}" data-name="${htmlEscape(name)}">Members</button>
-        ${isOwner ? `<button class="btn btn-danger" data-action="delete">Delete</button>` : ''}
-      </div>
-    </div>
-  `;
-
-  li.querySelector('[data-action="members"]')?.addEventListener('click', (e)=>{
-    e.preventDefault();
-    openMembersModal(id, name);
-  });
-
-  if (isOwner) {
-    li.querySelector('[data-action="delete"]')?.addEventListener('click', async (e)=>{
-      e.preventDefault();
-      try{
-        const ok = await deleteGroupById(id);
-        if (ok) li.remove();
-      }catch(err){
-        showToast(err.message || 'Failed to delete group','error');
-      }
-    });
-  }
-
-  return li;
-}
-
-function renderMyGroups(groups){
-  const ul = document.getElementById('gridMyGroups');
-  if(!ul) return;
-  ul.innerHTML = '';
-  groups.forEach(g => ul.appendChild(groupCardTemplate(g)));
-}
-
-function renderGroupLists(adminGroups, memberGroups){
-  gridAdminGroups?.replaceChildren();
-  gridMemberGroups?.replaceChildren();
-  adminGroups.forEach(g=> gridAdminGroups?.appendChild(groupCardTemplate(g, { isOwner:true })));
-  memberGroups.forEach(g=> gridMemberGroups?.appendChild(groupCardTemplate(g, { isOwner:false })));
-  // הגנות: אלמנטים מונים/ריקים אולי לא קיימים ב-HTML הנוכחי
-  $('#countAdminGroups')?.replaceChildren(document.createTextNode(`(${adminGroups.length})`));
-  $('#countMemberGroups')?.replaceChildren(document.createTextNode(`(${memberGroups.length})`));
-  $('#emptyAdminGroups')?.classList.toggle('hidden', adminGroups.length!==0);
-  $('#emptyMemberGroups')?.classList.toggle('hidden', memberGroups.length!==0);
-}
-
-async function loadGroups(){
-  try{
-    const data = await api('/api/groups?mine=1');
-    const a = Array.isArray(data?.admin) ? data.admin : (data?.adminGroups || data?.admins || []);
-    const m = Array.isArray(data?.member)? data.member: (data?.memberGroups|| data?.members || []);
-    if ((a && a.length) || (m && m.length)){ return renderGroupLists(a||[],m||[]) }
-    if (Array.isArray(data)){
-      const admin = data.filter(g=> g.role==='admin' || g.isOwner || g.createdBy === (CURRENT_USER?._id || CURRENT_USER?.id));
-      const member= data.filter(g=> !(admin.includes(g)));
-      renderMyGroups(Array.isArray(data) ? data : (data.items || []));
-      return renderGroupLists(admin, member);
+// multi-attempt API (helps avoid 404 on different servers)
+async function apiTry(attempts, body) {
+  let lastErr = new Error('Request failed');
+  for (const { path, method } of attempts) {
+    try {
+      const { res, data } = await fetchJSON(path, method, body);
+      if (res.ok) return data;
+      // continue if "not found", try next route
+      if (res.status === 404) { lastErr = new Error(data.message || res.statusText); continue; }
+      // for other statuses, stop and throw
+      throw new Error(data.message || data.msg || res.statusText);
+    } catch (e) {
+      lastErr = e;
     }
-  }catch{}
-
-  try{
-    const data2 = await api('/api/groups/mine');
-    const admin = data2.admin || data2.adminGroups || [];
-    const member= data2.member|| data2.memberGroups|| [];
-    return renderGroupLists(admin, member);
-  }catch{}
-
-  try{
-    const data3 = await api('/api/groups?member=me');
-    const admin = Array.isArray(data3) ? data3.filter(g=> g.role==='admin' || g.isOwner) : (data3.admin || []);
-    const member= Array.isArray(data3) ? data3.filter(g=> !(g.role==='admin'||g.isOwner)) : (data3.member||[]);
-    return renderGroupLists(admin, member);
-  }catch(e){
-    console.warn('loadGroups fallback failed', e.message);
   }
-
-  renderGroupLists([],[]);
+  throw lastErr;
 }
 
-/* Create Group modal */
-const groupModal=$('#groupModal'), groupForm=$('#groupForm');
-const openCreateGroup=$('#openCreateGroup'), openCreateGroup2=$('#openCreateGroup2');
-const closeGroupBtn=$('#closeGroup'), cancelGroupBtn=$('#cancelGroup');
-const groupCoverInput=groupForm?.coverFile;
-const groupCoverPreview=$('#groupCoverPreview');
+// ===== header user state =====
+let currentUser = null;
 
-function openGroupModal(){
-  groupForm?.reset();
-  if(groupCoverPreview){ groupCoverPreview.classList.add('hidden'); groupCoverPreview.innerHTML='' }
-  groupModal?.classList.remove('hidden'); lockScroll(true)
+async function loadUser() {
+  try {
+    const me = await api('/api/users/me');
+    $('#userBadge').textContent = `Signed in as ${me.username || me.user?.username || 'User'}`;
+    currentUser = me.user || me; // normalize
+    return currentUser;
+  } catch {
+    $('#userBadge').textContent = 'Not signed in';
+    currentUser = null;
+    return null;
+  }
 }
-function closeGroupModal(){ groupModal?.classList.add('hidden'); lockScroll(false) }
-openCreateGroup?.addEventListener('click', openGroupModal);
-openCreateGroup2?.addEventListener('click', openGroupModal);
-$('#emptyCreateGroup1')?.addEventListener('click', openGroupModal);
-$('#emptyCreateGroup2')?.addEventListener('click', openGroupModal);
-closeGroupBtn?.addEventListener('click', closeGroupModal);
-cancelGroupBtn?.addEventListener('click', closeGroupModal);
-groupModal?.addEventListener('click',(e)=>{ if(e.target===groupModal) closeGroupModal() });
-document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && !groupModal?.classList.contains('hidden')) closeGroupModal() });
 
-groupCoverInput?.addEventListener('change', async ()=>{
-  const f = groupCoverInput.files?.[0];
-  LAST_UPLOADED_GROUP_COVER_URL = null;
+$('#logoutBtn')?.addEventListener('click', async () => {
+  try {
+    await api('/api/users/logout', 'POST');
+    await loadUser();
+  } catch (e) { alert('Logout error: ' + e.message); }
+  window.location.href = '/';
+});
 
-  if(!f){
-    groupCoverPreview?.classList.add('hidden');
-    if(groupCoverPreview) groupCoverPreview.innerHTML='';
+// ===== profile posts state =====
+let profilePosts = [];
+
+// ===== render helpers =====
+function htmlEscape(s) {
+  return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+function heartSvg() {
+  return `
+    <svg class="heart" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2">
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+    </svg>`;
+}
+
+// --- actions bar (likes/comments) ---
+function makeActionsBar(p) {
+  const likedClass = p.userLiked ? 'liked' : '';
+  return `
+    <div class="post__actions">
+      <button class="icon-like ${likedClass}" data-id="${p._id}" aria-label="Like">
+        ${heartSvg()}
+        <span class="like-count">${p.likesCount ?? 0}</span>
+      </button>
+      <button class="preview-btn" data-id="${p._id}" aria-label="Open preview">
+        Comments (<span class="comment-count">${p.commentsCount ?? 0}</span>)
+      </button>
+    </div>
+  `;
+}
+
+// --- admin bar (edit/delete only — Preview removed) ---
+function makeAdminBar(p){
+  const id = p._id;
+  return `
+    <div class="post__admin">
+      <button class="btn edit-btn"   data-id="${id}">✏️ Edit</button>
+      <button class="btn btn-danger delete-btn" data-id="${id}">🗑️ Delete</button>
+    </div>
+  `;
+}
+
+function makePostCard(p) {
+  const li = document.createElement('li');
+  li.className = 'post';
+
+  const author = p.author?.username || currentUser?.username || 'Unknown';
+  const when   = p.createdAt ? fmtExact(p.createdAt) : '';
+  const title  = htmlEscape(p.title || '');
+  const text   = htmlEscape(p.content || '');
+
+  li.innerHTML = `
+    <div class="post__hdr">
+      <div class="avatar" title="${author}"></div>
+      <div class="hdr__meta">
+        <span class="hdr__name">${author}</span>
+        <span class="hdr__time">${when}</span>
+      </div>
+    </div>
+    ${p.images?.[0] ? `
+      <a class="post__img" href="${p.images[0]}" target="_blank" rel="noopener">
+        <img src="${p.images[0]}" alt="">
+      </a>` : ``}
+    <div class="post__body">
+      ${title ? `<h3 class="post__title">${title}</h3>` : ``}
+      ${text  ? `<p class="post__text">${text}</p>` : ``}
+    </div>
+    ${makeActionsBar(p)}
+    ${makeAdminBar(p)}
+  `;
+
+  // wire events
+  li.querySelector('.icon-like')?.addEventListener('click', onToggleLike);
+  li.querySelector('.preview-btn')?.addEventListener('click', openPreviewFromBtn);
+  li.querySelector('.edit-btn')?.addEventListener('click', (e)=> openEditPost(e.currentTarget.dataset.id));
+  li.querySelector('.delete-btn')?.addEventListener('click', (e)=> onDeletePost(e.currentTarget.dataset.id));
+
+  return li;
+}
+
+// ===== utils: identify my post robustly =====
+function isMine(post, me) {
+  if (!post || !me) return false;
+
+  const meId = me._id || me.id;
+  const meUsername = me.username;
+
+  const a = post.author;
+  if (a && typeof a === 'object') {
+    if (a._id && meId && String(a._id) === String(meId)) return true;
+    if (a.id && meId && String(a.id) === String(meId)) return true;
+    if (a.username && meUsername && String(a.username) === String(meUsername)) return true;
+  }
+  if (typeof a === 'string' && meId && String(a) === String(meId)) return true;
+
+  if (post.authorId && meId && String(post.authorId) === String(meId)) return true;
+  if (post.userId && meId && String(post.userId) === String(meId)) return true;
+  if (post.user && typeof post.user === 'object' && post.user._id && meId && String(post.user._id) === String(meId)) return true;
+  if (post.username && meUsername && String(post.username) === String(meUsername)) return true;
+
+  return false;
+}
+
+// ===== load ONLY logged-in user's posts (client-filtered fallback) =====
+async function loadProfilePosts() {
+  const me = currentUser || await loadUser();
+  if (!me) {
+    $('#countWith').textContent = '(0)';
+    $('#countNo').textContent = '(0)';
+    $('#emptyWith')?.classList.remove('hidden');
+    $('#emptyNo')?.classList.remove('hidden');
     return;
   }
 
-  const localUrl = URL.createObjectURL(f);
-  if(groupCoverPreview){
-    groupCoverPreview.innerHTML = `
-      <img src="${localUrl}" alt="preview" style="max-width:180px;border-radius:12px">
-      <small class="muted">${f.name} • ${(f.size/1024).toFixed(1)} KB</small>
-      <small class="muted" id="groupCoverStatus">Uploading…</small>
-    `;
-    groupCoverPreview.classList.remove('hidden');
+  $('#profileName') && ($('#profileName').textContent = me.username || 'My Profile');
+
+  let mine = [];
+  let page = 1;
+  const limit = 50;
+
+  try {
+    while (true) {
+      const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('limit', String(limit));
+      if (me._id) {
+        params.set('authorId', me._id);
+        params.set('userId', me._id);
+      }
+      if (me.username) params.set('author', me.username);
+      params.set('mine', 'true');
+
+      const data = await api('/api/posts?' + params.toString());
+      const items = Array.isArray(data) ? data : (data.items || []);
+
+      const onlyMine = items.filter(p => isMine(p, me));
+      mine = mine.concat(onlyMine);
+
+      const count = items.length;
+      const hasMore =
+        (typeof data.pages === 'number' ? page < data.pages :
+         typeof data.hasMore === 'boolean' ? data.hasMore :
+         count === limit);
+
+      if (!hasMore) break;
+      page++;
+      if (page > 200) break;
+    }
+  } catch (e) {
+    console.error('Error loading profile posts:', e);
+    mine = [];
   }
 
-  try{
-    const { url } = await uploadImage(f);
-    LAST_UPLOADED_GROUP_COVER_URL = url || null;
+  profilePosts = mine;
 
-    if(url && groupCoverPreview){
-      groupCoverPreview.querySelector('img').src = toImageUrl(url);
-      const st = groupCoverPreview.querySelector('#groupCoverStatus');
-      if(st) st.textContent = 'Uploaded ✓';
+  const posts    = mine.filter(p => Array.isArray(p.images) && p.images[0]);
+  const statuses = mine.filter(p => !Array.isArray(p.images) || !p.images[0]);
+
+  $('#countWith').textContent = `(${posts.length})`;
+  $('#countNo').textContent   = `(${statuses.length})`;
+
+  renderProfilePosts(posts, 'gridWith', 'emptyWith');
+  renderProfilePosts(statuses, 'gridNo', 'emptyNo');
+}
+
+function renderProfilePosts(items, gridId, emptyId) {
+  const grid = $(`#${gridId}`);
+  const empty = $(`#${emptyId}`);
+  if (!grid || !empty) return;
+
+  grid.innerHTML = '';
+
+  if (!items || items.length === 0) {
+    empty.classList.remove('hidden');
+    return;
+  }
+
+  empty.classList.add('hidden');
+  items.forEach(p => grid.appendChild(makePostCard(p)));
+}
+
+// ======= Likes =======
+async function onToggleLike(ev) {
+  if (!currentUser) { alert('Please sign in to like'); return; }
+  const btn = ev.currentTarget.closest('.icon-like');
+  const id = btn?.dataset?.id;
+  if (!id) return;
+
+  const liked = btn.classList.contains('liked');
+  const countEl = btn.querySelector('.like-count');
+
+  // optimistic
+  btn.classList.toggle('liked');
+  if (countEl) {
+    const curr = parseInt(countEl.textContent || '0', 10) || 0;
+    countEl.textContent = String(liked ? Math.max(0, curr - 1) : curr + 1);
+  }
+
+  try {
+    const res = await api(`/api/posts/${encodeURIComponent(id)}/like`, 'POST');
+    if (countEl) countEl.textContent = String(res.likesCount ?? 0);
+    btn.classList.toggle('liked', !!res.liked);
+
+    if (previewState.postId === id) {
+      const pvLike = $('#pv-like-count'); if (pvLike) pvLike.textContent = String(res.likesCount ?? 0);
+      const pvHeart = $('#pv-like-btn');  if (pvHeart) pvHeart.classList.toggle('liked', !!res.liked);
     }
-  }catch(err){
-    const st = groupCoverPreview?.querySelector('#groupCoverStatus');
-    if(st) st.textContent = 'Upload failed';
-    showToast(err.message || 'Upload failed', 'error');
+  } catch (e) {
+    // revert optimistic
+    btn.classList.toggle('liked');
+    if (countEl) {
+      const curr = parseInt(countEl.textContent || '0', 10) || 0;
+      countEl.textContent = String(liked ? curr + 1 : Math.max(0, curr - 1));
+    }
+    alert('Like error: ' + e.message);
+  }
+}
+
+// ======= Preview & Comments =======
+const previewModal = $('#previewModal');
+const closePreviewBtn = $('#closePreview');
+const previewBoxEl = $('#previewContent');
+const previewState = { postId: null };
+
+function openPreview() { previewModal?.classList.remove('hidden'); lockScroll(true); }
+function closePreview() { previewModal?.classList.add('hidden'); lockScroll(false); previewState.postId = null; previewBoxEl.innerHTML=''; }
+
+closePreviewBtn?.addEventListener('click', closePreview);
+previewModal?.addEventListener('click', (e) => { if (e.target === previewModal) closePreview(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !previewModal?.classList.contains('hidden')) closePreview(); });
+
+function openPreviewFromBtn(ev){
+  const id = ev.currentTarget?.dataset?.id;
+  if (!id) return;
+  loadPreview(id);
+}
+
+async function loadPreview(id){
+  try {
+    const p = await api(`/api/posts/${encodeURIComponent(id)}/preview`);
+    previewState.postId = id;
+
+    const author = p.author?.username || currentUser?.username || 'Unknown';
+    const when   = p.createdAt ? fmtExact(p.createdAt) : '';
+    const title  = htmlEscape(p.title || '');
+    const text   = htmlEscape(p.content || '');
+
+    const likedClass = p.userLiked ? 'liked' : '';
+
+    previewBoxEl.innerHTML = `
+      <article>
+        <header style="display:flex;gap:10px;align-items:center;margin-bottom:6px">
+          <div class="avatar"></div>
+          <div class="hdr__meta">
+            <strong>${author}</strong>
+            <div class="muted" style="font-size:.9rem">${when}</div>
+          </div>
+        </header>
+        ${p.images?.[0] ? `<div class="preview__img"><img src="${p.images[0]}" alt="" style="width:100%;display:block"></div>` : ''}
+        <h3 style="margin:.6rem 0 0">${title}</h3>
+        <p style="margin:.3rem 0 1rem;white-space:pre-wrap">${text}</p>
+
+        <div class="preview__meta" style="margin-bottom:.5rem">
+          <button id="pv-like-btn" class="icon-like ${likedClass}" data-id="${p._id}" aria-label="Like">
+            ${heartSvg()} <span id="pv-like-count" class="count-pill">${p.likesCount ?? 0}</span>
+          </button>
+          <span class="count-pill">Comments: <span id="pv-comment-count">${p.commentsCount ?? 0}</span></span>
+        </div>
+
+        <section class="preview__comments">
+          <h4 style="margin:0 0 .4rem">Comments</h4>
+          <div id="pv-comments-list"></div>
+
+          <form id="pv-comment-form" style="display:grid;gap:8px;margin-top:8px">
+            <textarea id="pv-comment-text" class="input" rows="3" placeholder="Write a comment..." required></textarea>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+              <button type="submit" class="btn btn--primary">Add comment</button>
+            </div>
+          </form>
+        </section>
+      </article>
+    `;
+
+    $('#pv-like-btn')?.addEventListener('click', onToggleLike);
+
+    const list = $('#pv-comments-list');
+    list.innerHTML = '';
+    (p.comments || []).forEach(c => list.appendChild(renderCommentItem(c)));
+
+    $('#pv-comment-form')?.addEventListener('submit', onAddComment);
+
+    openPreview();
+  } catch (e) {
+    alert('Preview error: ' + e.message);
+  }
+}
+
+function renderCommentItem(c) {
+  const div = document.createElement('div');
+  div.className = 'comment';
+  const uname = c.user?.username || 'User';
+  const when = c.createdAt ? fmtExact(c.createdAt) : '';
+  div.innerHTML = `
+    <div class="comment__head">
+      <span>${htmlEscape(uname)}</span>
+      <span>${when}</span>
+    </div>
+    <div class="comment__text">${htmlEscape(c.text || '')}</div>
+  `;
+  return div;
+}
+
+async function onAddComment(ev) {
+  ev.preventDefault();
+  if (!currentUser) { alert('Please sign in to comment'); return; }
+  const id = previewState.postId;
+  if (!id) return;
+  const ta = $('#pv-comment-text');
+  const text = ta?.value?.trim() || '';
+  if (!text) return;
+
+  try {
+    const res = await api(`/api/posts/${encodeURIComponent(id)}/comments`, 'POST', { text });
+    const list = $('#pv-comments-list');
+    list.prepend(renderCommentItem(res));
+    ta.value = '';
+    $('#pv-comment-count').textContent = String(res.commentsCount ?? (parseInt($('#pv-comment-count').textContent||'0',10)+1));
+    const btn = document.querySelector(`.preview-btn[data-id="${CSS.escape(id)}"]`);
+    const span = btn?.querySelector('.comment-count');
+    if (span) span.textContent = String(res.commentsCount ?? parseInt(span.textContent||'0',10)+1);
+  } catch (e) {
+    alert('Comment error: ' + e.message);
+  }
+}
+
+// ===== modal: create post =====
+const modal = $('#modal');
+function lockScroll(yes) { document.body.style.overflow = yes ? 'hidden' : ''; }
+function openModal() { if (!modal) return; modal.classList.remove('hidden'); lockScroll(true); }
+function closeModal() { if (!modal) return; modal.classList.add('hidden');  lockScroll(false); }
+
+$('#newPostBtn')?.addEventListener('click', openModal);
+$('#closeModal')?.addEventListener('click', closeModal);
+$('#cancelPost')?.addEventListener('click', closeModal);
+$('#emptyNewPost1')?.addEventListener('click', openModal);
+$('#emptyNewPost2')?.addEventListener('click', openModal);
+
+modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal?.classList.contains('hidden')) closeModal(); });
+
+// image preview (local)
+const imageFileEl = document.querySelector('input[name="imageFile"]');
+const previewBox = $('#imagePreview');
+
+imageFileEl?.addEventListener('change', () => {
+  const f = imageFileEl.files?.[0];
+  if (!f) { previewBox.classList.add('hidden'); previewBox.innerHTML = ''; return; }
+  const url = URL.createObjectURL(f);
+  previewBox.innerHTML = `<img src="${url}" alt="preview"><small class="muted">${f.name} • ${(f.size/1024).toFixed(1)} KB</small>`;
+  previewBox.classList.remove('hidden');
+});
+
+// upload helper
+async function uploadImage(file) {
+  const fd = new FormData();
+  fd.append('image', file);
+  const res = await fetch('/api/uploads', { method: 'POST', body: fd, credentials: 'include' });
+  if (!res.ok) {
+    const txt = await res.text().catch(()=> '');
+    throw new Error(`Upload failed (${res.status}): ${txt || res.statusText}`);
+  }
+  return await res.json(); // { url }
+}
+
+function clearFormFields(form){
+  form.reset();
+  previewBox?.classList.add('hidden');
+  previewBox.innerHTML = '';
+}
+
+$('#clearForm')?.addEventListener('click', () => {
+  const f = $('#postForm'); if (f) clearFormFields(f);
+});
+
+$('#postForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+
+  const title   = f.title?.value?.trim() || '';
+  const content = f.content?.value?.trim() || '';
+  const tags         = f.tags?.value?.trim() || '';
+  const location     = f.location?.value?.trim() || '';
+  const visibility   = f.visibility?.value || 'public';
+  const allowComments= !!f.allowComments?.checked;
+
+  if (!title || !content) { alert('Please fill title and content'); return; }
+
+  try {
+    const payload = { title, content, tags, location, visibility, allowComments, status: 'published' };
+
+    const imgFile = f.imageFile?.files?.[0];
+    if (imgFile) {
+      const { url } = await uploadImage(imgFile);
+      if (url) payload.images = [url];
+    }
+
+    await api('/api/posts', 'POST', payload);
+    closeModal();
+    clearFormFields(f);
+    await loadProfilePosts();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    toastOK('Post published');
+  } catch (e) {
+    alert('Create post error: ' + e.message);
   }
 });
 
-async function uploadGroupCoverIfAny(){
-  const f=groupCoverInput?.files?.[0]; if(!f) return null;
-  const { url } = await uploadImage(f);
-  return url || null;
+// ===== settings modal =====
+const settingsModal = $('#settingsModal');
+const closeSettingsBtn = $('#closeSettings');
+const cancelSettingsBtn = $('#cancelSettings');
+
+function openSettings() { if (!settingsModal) return; settingsModal.classList.remove('hidden'); lockScroll(true); }
+function closeSettings() { if (!settingsModal) return; settingsModal.classList.add('hidden'); lockScroll(false); }
+
+$('#openSettings')?.addEventListener('click', openSettings);
+closeSettingsBtn?.addEventListener('click', closeSettings);
+cancelSettingsBtn?.addEventListener('click', closeSettings);
+
+settingsModal?.addEventListener('click', (e) => { if (e.target === settingsModal) closeSettings(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !settingsModal?.classList.contains('hidden')) closeSettings(); });
+
+// Load user data into settings form
+async function loadUserSettings() {
+  try {
+    const user = await api('/api/users/me');
+    const me = user.user || user;
+    const form = $('#settingsForm');
+    if (form && me) {
+      form.username.value = me.username || '';
+      form.email.value = me.email || '';
+    }
+  } catch (e) {
+    console.error('Error loading user settings:', e);
+  }
 }
+
+// Save settings (PATCH/PUT fallback to avoid 404)
+$('#settingsForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+
+  const username = f.username?.value?.trim() || '';
+  const email = f.email?.value?.trim() || '';
+  const currentPassword = f.currentPassword?.value || '';
+  const newPassword = f.newPassword?.value || '';
+  const confirmPassword = f.confirmPassword?.value || '';
+
+  if (!username) { alert('Username is required'); return; }
+  if (newPassword && newPassword !== confirmPassword) { alert('New passwords do not match'); return; }
+
+  try {
+    const payload = { username, email };
+    if (currentPassword && newPassword) {
+      payload.currentPassword = currentPassword;
+      payload.newPassword = newPassword;
+    }
+
+    await apiTry([
+      { path: '/api/users/me', method: 'PATCH' },
+      { path: '/api/users/me', method: 'PUT' },
+    ], payload);
+
+    closeSettings();
+    await loadUser();
+    toastOK('Settings updated');
+  } catch (e) {
+    alert('Save settings error: ' + e.message);
+  }
+});
+
+// ===== Edit Post (modal) =====
+const editModal = $('#editModal');
+const closeEditBtn = $('#closeEdit');
+const cancelEditBtn = $('#cancelEdit');
+const editForm = $('#editForm');
+const editImageFileEl = editForm?.querySelector('input[name="imageFile"]');
+const editImagePreview = $('#editImagePreview');
+const editPreviewBox = $('#editPreviewBox');
+
+let editState = { id: null, original: null };
+
+function openEditPost(id){
+  const p = profilePosts.find(x => String(x._id) === String(id));
+  if (!p) return alert('Post not found');
+  editState.id = id;
+  editState.original = p;
+
+  // Prefill form
+  editForm.title.value = p.title || '';
+  editForm.content.value = p.content || '';
+  editForm.removeImage.checked = false;
+  if (editImageFileEl) editImageFileEl.value = '';
+  editImagePreview.classList.add('hidden');
+  editImagePreview.innerHTML = '';
+
+  // Preview current
+  editPreviewBox.innerHTML = `
+    ${p.images?.[0] ? `<img class="view-cover" src="${p.images[0]}" alt="">` : `<div class="muted">No image</div>`}
+  `;
+
+  editModal.classList.remove('hidden'); lockScroll(true);
+}
+
+closeEditBtn?.addEventListener('click', ()=>{ editModal.classList.add('hidden'); lockScroll(false); });
+cancelEditBtn?.addEventListener('click', ()=>{ editModal.classList.add('hidden'); lockScroll(false); });
+
+editImageFileEl?.addEventListener('change', ()=>{
+  const f = editImageFileEl.files?.[0];
+  if (!f){ editImagePreview.classList.add('hidden'); editImagePreview.innerHTML=''; return; }
+  const url = URL.createObjectURL(f);
+  editImagePreview.innerHTML = `<img src="${url}" alt="preview"><small class="muted">${f.name} • ${(f.size/1024).toFixed(1)} KB</small>`;
+  editImagePreview.classList.remove('hidden');
+});
+
+editForm?.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const id = editState.id;
+  if (!id) return;
+
+  const title = editForm.title.value.trim();
+  const content = editForm.content.value.trim();
+  const removeImage = !!editForm.removeImage.checked;
+
+  if (!title || !content) return alert('Please fill title and content');
+
+  try{
+    const payload = { title, content };
+
+    // image handling
+    const newFile = editImageFileEl?.files?.[0];
+    if (removeImage){
+      payload.images = [];
+    } else if (newFile){
+      const { url } = await uploadImage(newFile);
+      if (url) payload.images = [url];
+    }
+
+    const updated = await apiTry([
+      { path: `/api/posts/${encodeURIComponent(id)}`, method: 'PATCH' },
+      { path: `/api/posts/${encodeURIComponent(id)}`, method: 'PUT' },
+      { path: `/api/posts/${encodeURIComponent(id)}/update`, method: 'POST' },
+    ], payload);
+
+    // update local + refresh lists
+    const idx = profilePosts.findIndex(p => String(p._id) === String(id));
+    if (idx !== -1) profilePosts[idx] = { ...profilePosts[idx], ...updated };
+    await loadProfilePosts();
+
+    editModal.classList.add('hidden'); lockScroll(false);
+    toastOK('Post updated');
+  } catch (err){
+    alert('Edit error: ' + err.message);
+  }
+});
+
+async function onDeletePost(id){
+  if (!confirm('Delete this post? This action cannot be undone.')) return;
+  try{
+    await apiTry([
+      { path: `/api/posts/${encodeURIComponent(id)}`, method: 'DELETE' },
+      { path: `/api/posts/${encodeURIComponent(id)}/delete`, method: 'POST' },
+    ]);
+    profilePosts = profilePosts.filter(p => String(p._id) !== String(id));
+    await loadProfilePosts();
+    toastOK('Post deleted');
+  } catch(e){
+    alert('Delete error: ' + e.message);
+  }
+}
+
+// ===== Toast helpers =====
+function toastOK(msg){
+  const t = $('#toast'); if(!t) return;
+  t.textContent = msg; t.classList.remove('hidden','error'); t.classList.add('ok');
+  setTimeout(()=> t.classList.add('hidden'), 1500);
+}
+function toastErr(msg){
+  const t = $('#toast'); if(!t) return alert(msg);
+  t.textContent = msg; t.classList.remove('hidden','ok'); t.classList.add('error');
+  setTimeout(()=> t.classList.add('hidden'), 2000);
+}
+
+// ===== Groups (mine + owned management) =====
+async function loadMyGroups(){
+  const me = currentUser || await loadUser();
+  if (!me) return;
+
+  try{
+    const list = await api('/api/groups/mine'); // groups where owner or member
+    const owned  = list.filter(g => String(g.owner?._id || g.owner) === String(me._id || me.id));
+    const member = list.filter(g => String(g.owner?._id || g.owner) !== String(me._id || me.id));
+
+    renderOwnedGroups(owned);
+    renderMemberGroups(member);
+  } catch(e){
+    console.error('Groups load error:', e);
+  }
+}
+
+function renderOwnedGroups(groups){
+  const grid = $('#gridAdminGroups'); if(!grid) return;
+  grid.innerHTML = (groups||[]).map(g => groupCardHTML(g, true)).join('');
+  wireGroupCards(grid);
+}
+
+function renderMemberGroups(groups){
+  const grid = $('#gridMyGroups'); if(!grid) return;
+  const empty = $('#emptyMemberGroups');
+  grid.innerHTML = (groups||[]).map(g => groupCardHTML(g, false)).join('');
+  if (!groups || groups.length === 0) empty?.classList.remove('hidden'); else empty?.classList.add('hidden');
+  wireGroupCards(grid);
+}
+
+function groupCardHTML(g, isOwner){
+  const name = htmlEscape(g.name || '(Group)');
+  const firstLetter = (g.name?.trim()?.charAt(0) || '?').toUpperCase();
+  const desc = htmlEscape(g.description || '');
+  const count = Array.isArray(g.members) ? g.members.length : (g.membersCount ?? 0);
+  return `
+    <li>
+      <div class="group-card" data-id="${g._id}">
+        <div class="group-card__head">
+          <span class="group-card__avatar"><span class="avatar-fallback">${firstLetter}</span></span>
+          <h3 class="group-card__name" title="${name}">${name}</h3>
+        </div>
+        <p class="group-card__desc" style="-webkit-line-clamp:2">${desc}</p>
+        <div class="group-card__foot">
+          <div class="group-card__meta">
+            <span class="pill members-pill" data-count="${count}">${count} member${count===1?'':'s'}</span>
+          </div>
+          <div class="group-card__actions">
+            ${isOwner
+              ? `<button class="btn manage-members">👥 Manage</button>
+                 <button class="btn btn-danger delete-group">🗑️ Delete</button>`
+              : `<button class="btn view-members">👀 View members</button>`
+            }
+          </div>
+        </div>
+      </div>
+    </li>
+  `;
+}
+
+function wireGroupCards(scope){
+  $$('.manage-members', scope).forEach(b => b.addEventListener('click', (e)=>{
+    const id = e.currentTarget.closest('.group-card')?.dataset?.id; if (!id) return;
+    openMembersModal(id, { manage: true });
+  }));
+  $$('.view-members', scope).forEach(b => b.addEventListener('click', (e)=>{
+    const id = e.currentTarget.closest('.group-card')?.dataset?.id; if (!id) return;
+    openMembersModal(id, { manage: false });
+  }));
+  $$('.delete-group', scope).forEach(b => b.addEventListener('click', async (e)=>{
+    const card = e.currentTarget.closest('.group-card');
+    const id = card?.dataset?.id; if (!id) return;
+    if (!confirm('Delete this group? This will remove the group for all members.')) return;
+    try{
+      await api(`/api/groups/${encodeURIComponent(id)}`, 'DELETE');
+      card.closest('li')?.remove();
+      toastOK('Group deleted');
+    } catch(err){
+      toastErr('Delete group error: ' + err.message);
+    }
+  }));
+}
+
+// ===== Create Group modal (fixed wiring) =====
+const groupModal = $('#groupModal');
+const closeGroupBtn = $('#closeGroup');
+const cancelGroupBtn = $('#cancelGroup');
+const groupForm = $('#groupForm');
+
+function openGroupModal() { if (!groupModal) return; groupModal.classList.remove('hidden'); lockScroll(true); }
+function closeGroupModal() { if (!groupModal) return; groupModal.classList.add('hidden'); lockScroll(false); }
+
+$('#openCreateGroup2')?.addEventListener('click', openGroupModal);
+$('#emptyCreateGroup2')?.addEventListener('click', openGroupModal);
+closeGroupBtn?.addEventListener('click', closeGroupModal);
+cancelGroupBtn?.addEventListener('click', closeGroupModal);
+
+groupModal?.addEventListener('click', (e) => { if (e.target === groupModal) closeGroupModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !groupModal?.classList.contains('hidden')) closeGroupModal(); });
 
 groupForm?.addEventListener('submit', async (e)=>{
   e.preventDefault();
-  const name = groupForm.name.value.trim();
-  const description = groupForm.description.value.trim();
-  const visibility = groupForm.visibility?.value || 'public'; // ✅ מונע קריסה כשאין שדה
-
-  if(!name || !description) return showToast('Name & description are required','error');
-
+  const f = e.target;
+  const name = f.name?.value?.trim() || '';
+  const description = f.description?.value?.trim() || '';
+  if (!name || !description) return alert('Please fill all fields');
   try{
-    const payload = { name, description, isPublic: visibility === 'public' };
-    if (LAST_UPLOADED_GROUP_COVER_URL) payload.coverImage = LAST_UPLOADED_GROUP_COVER_URL;
-
-    const endpoints = [
-      { url:'/api/groups', method:'POST', body:payload },
-      { url:'/api/groups/create', method:'POST', body:payload },
-      { url:'/api/groups/new', method:'POST', body:payload },
-    ];
-    let ok=false;
-    for (const ep of endpoints){
-      try{ await api(ep.url, ep.method, ep.body); ok=true; break }
-      catch(err){ if(/^(400|404|405)/.test(String(err.message))) continue; throw err }
-    }
-    if(!ok) throw new Error('Group create endpoint not found');
-
-    showToast('Group created ✔','ok');
-    LAST_UPLOADED_GROUP_COVER_URL = null;
+    await api('/api/groups', 'POST', { name, description });
     closeGroupModal();
-    await loadGroups();
-  }catch(err){
-    showToast(err.message || 'Failed to create group','error');
+    f.reset();
+    await loadMyGroups();
+    toastOK('Group created');
+  } catch (err){
+    alert('Create group error: ' + err.message);
   }
 });
 
-// ===== Members Modal Logic =====
-const membersModal   = $('#membersModal');
-const closeMembersBtn= $('#closeMembers');
-const membersListEl  = $('#membersList');
-const membersEmptyEl = $('#membersEmpty');
-const membersSearch  = $('#membersSearch');
-const membersCountEl = $('#membersCount');
+// ===== Members modal =====
+const membersModal = $('#membersModal');
+const closeMembersBtn = $('#closeMembers');
+const membersSearch = $('#membersSearch');
+const membersCount = $('#membersCount');
+const membersList = $('#membersList');
+const membersEmpty = $('#membersEmpty');
 
-let MEMBERS_GROUP_ID   = null;
-let MEMBERS_GROUP_NAME = '';
-let MEMBERS_CAN_REMOVE = false;
-let MEMBERS_DATA       = [];
-let MEMBERS_FILTERED   = [];
+const membersState = { groupId: null, canRemove: false, all: [], filtered: [] };
 
-function openMembersModal(groupId, groupName){
-  MEMBERS_GROUP_ID = groupId;
-  MEMBERS_GROUP_NAME = groupName || 'Group';
-  $('#membersTitle')?.replaceChildren(document.createTextNode(`Members • ${groupName || 'Group'}`));
-  membersModal?.classList.remove('hidden');
-  document.body.style.overflow = 'hidden';
-  loadMembers();
+function openMembersModal(groupId, { manage } = { manage: false }){
+  loadGroupMembers(groupId, manage).then(()=>{
+    membersModal?.classList.remove('hidden');
+    lockScroll(true);
+  }).catch(e=>{
+    toastErr('Load members error: ' + e.message);
+  });
 }
 
 function closeMembersModal(){
   membersModal?.classList.add('hidden');
-  document.body.style.overflow = '';
-  MEMBERS_GROUP_ID = null;
-  MEMBERS_DATA = [];
-  MEMBERS_FILTERED = [];
-  MEMBERS_CAN_REMOVE = false;
-  if (membersListEl) membersListEl.innerHTML = '';
+  lockScroll(false);
+  membersState.groupId = null;
+  membersState.all = [];
+  membersList.innerHTML = '';
+  membersSearch.value = '';
 }
 
 closeMembersBtn?.addEventListener('click', closeMembersModal);
-membersModal?.addEventListener('click', (e)=>{ if(e.target === membersModal) closeMembersModal(); });
-document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && !membersModal?.classList.contains('hidden')) closeMembersModal(); });
+membersModal?.addEventListener('click', (e)=>{ if (e.target === membersModal) closeMembersModal(); });
+document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape' && !membersModal?.classList.contains('hidden')) closeMembersModal(); });
 
-async function loadMembers(){
-  if (!MEMBERS_GROUP_ID) return;
-  if (membersListEl){
-    membersListEl.innerHTML = '';
-    for (let i=0;i<3;i++){
-      const li=document.createElement('li');
-      li.className='member-row skeleton';
-      li.innerHTML = `<div class="member-main">
-        <div class="member-avatar skel"></div>
-        <div class="member-meta" style="flex:1">
-          <div class="line skel" style="width:60%"></div>
-          <div class="line skel" style="width:40%"></div>
-        </div>
-      </div>`;
-      membersListEl.appendChild(li);
-    }
+async function loadGroupMembers(groupId, manageFlag){
+  const data = await api(`/api/groups/${encodeURIComponent(groupId)}/members`);
+  const canRemove = !!data.canRemove && !!manageFlag;
+  const members = Array.isArray(data.members) ? data.members : [];
+  membersState.groupId = groupId;
+  membersState.canRemove = canRemove;
+  membersState.all = members;
+  renderMembers(members, canRemove);
+}
+
+function renderMembers(list, canRemove){
+  membersList.innerHTML = '';
+  if (!list || list.length === 0){
+    membersEmpty?.classList.remove('hidden');
+    membersCount.textContent = '(0)';
+    return;
   }
+  membersEmpty?.classList.add('hidden');
+  membersCount.textContent = `(${list.length})`;
 
+  const frag = document.createDocumentFragment();
+  list.forEach(m => frag.appendChild(memberRow(m, canRemove)));
+  membersList.appendChild(frag);
+}
+
+function memberRow(m, canRemove){
+  const li = document.createElement('li');
+  li.className = 'member-row';
+  li.dataset.id = m._id;
+  const initials = (m.username || 'U').slice(0,2).toUpperCase();
+  li.innerHTML = `
+    <div class="member-main">
+      <div class="member-avatar">${initials}</div>
+      <div class="member-meta">
+        <div class="member-name">${htmlEscape(m.username || 'User')}</div>
+        <div class="member-sub">${htmlEscape(m.email || '')}</div>
+      </div>
+    </div>
+    <div class="member-actions">
+      ${canRemove ? `<button class="btn-danger remove-member">Remove</button>` : ``}
+    </div>
+  `;
+  if (canRemove){
+    li.querySelector('.remove-member')?.addEventListener('click', ()=> onRemoveMember(m._id));
+  }
+  return li;
+}
+
+membersSearch?.addEventListener('input', ()=>{
+  const q = membersSearch.value.trim().toLowerCase();
+  const all = membersState.all || [];
+  const filtered = q
+    ? all.filter(m => (m.username||'').toLowerCase().includes(q) || (m.email||'').toLowerCase().includes(q))
+    : all.slice();
+  renderMembers(filtered, membersState.canRemove);
+});
+
+async function onRemoveMember(userId){
+  const gid = membersState.groupId; if (!gid) return;
+  if (!confirm('Remove this member from the group?')) return;
   try{
-    const res = await api(`/api/groups/${encodeURIComponent(MEMBERS_GROUP_ID)}/members`, 'GET');
-    MEMBERS_CAN_REMOVE = !!res.canRemove;
-    MEMBERS_DATA = Array.isArray(res.members) ? res.members : [];
-    applyMembersFilter();
-  }catch(err){
-    if (membersListEl) membersListEl.innerHTML = `<li class="member-row"><div class="member-main"><div class="member-meta"><div class="member-name">Error</div><div class="member-sub">${htmlEscape(err.message)}</div></div></div></li>`;
-    MEMBERS_CAN_REMOVE = false;
-    MEMBERS_DATA = [];
-    applyMembersFilter();
+    await api(`/api/groups/${encodeURIComponent(gid)}/members/${encodeURIComponent(userId)}`, 'DELETE');
+    membersState.all = membersState.all.filter(m => String(m._id) !== String(userId));
+    const row = membersList.querySelector(`.member-row[data-id="${CSS.escape(userId)}"]`);
+    row?.remove();
+
+    const newCount = membersState.all.length;
+    membersCount.textContent = `(${newCount})`;
+    if (newCount === 0) membersEmpty?.classList.remove('hidden');
+
+    updateGroupCardCount(gid, newCount);
+
+    toastOK('Member removed');
+  } catch(e){
+    toastErr('Remove member error: ' + e.message);
   }
 }
 
-function applyMembersFilter(){
-  const q = (membersSearch?.value || '').trim().toLowerCase();
-  MEMBERS_FILTERED = MEMBERS_DATA.filter(m => {
-    const hay = `${m.username || ''} ${m.email || ''}`.toLowerCase();
-    return !q || hay.includes(q);
-  });
-  renderMembersList();
-}
-
-membersSearch?.addEventListener('input', applyMembersFilter);
-
-function renderMembersList(){
-  if (!membersListEl) return;
-  membersListEl.innerHTML = '';
-
-  if (!MEMBERS_FILTERED.length){
-    membersEmptyEl?.classList.remove('hidden');
-  } else {
-    membersEmptyEl?.classList.add('hidden');
-  }
-
-  membersCountEl?.replaceChildren(document.createTextNode(`(${MEMBERS_DATA.length})`));
-
-  for (const m of MEMBERS_FILTERED){
-    const li = document.createElement('li');
-    li.className = 'member-row';
-    const uname = htmlEscape(m.username || 'User');
-    const email = htmlEscape(m.email || '');
-
-    li.innerHTML = `
-      <div class="member-main">
-        <div class="member-avatar">${(uname[0]||'U').toUpperCase()}</div>
-        <div class="member-meta">
-          <div class="member-name">${uname}</div>
-          <div class="member-sub">${email}</div>
-        </div>
-      </div>
-      <div class="member-actions">
-        ${MEMBERS_CAN_REMOVE ? `<button class="btn btn-danger" data-remove="${m._id}">Remove</button>` : ''}
-      </div>
-    `;
-
-    if (MEMBERS_CAN_REMOVE){
-      const btn = li.querySelector('[data-remove]');
-      btn?.addEventListener('click', async (e)=>{
-        e.preventDefault();
-
-        const userId = e.currentTarget.dataset.remove || e.currentTarget.getAttribute('data-remove');
-        if (!userId) { showToast('No user id','error'); return; }
-
-        const ok = confirm(`Remove ${m.username || 'this member'} from "${MEMBERS_GROUP_NAME}"?`);
-        if (!ok) return;
-
-        try{
-          // נטרל לחיצה כפולה
-          btn.disabled = true;
-
-          const url = `/api/groups/${encodeURIComponent(MEMBERS_GROUP_ID)}/members/${encodeURIComponent(userId)}`;
-          await api(url, 'DELETE');
-
-          // הסרה מקומית
-          MEMBERS_DATA = MEMBERS_DATA.filter(x => String(x._id) !== String(userId));
-          applyMembersFilter();
-
-          // עדכון מונה בכרטיס קבוצה (אם קיים בעמוד)
-          const pill = document.querySelector(`[data-members-count="${MEMBERS_GROUP_ID}"]`);
-          if (pill){
-            pill.textContent = `${MEMBERS_DATA.length} members`;
-          }
-
-          showToast('Member removed ✔','ok');
-        }catch(err){
-          showToast(err.message || 'Failed to remove member','error');
-        }finally{
-          btn.disabled = false;
-        }
-      });
-    }
-
-
-    membersListEl.appendChild(li);
+function updateGroupCardCount(groupId, newCount){
+  const card = $(`.group-card[data-id="${CSS.escape(groupId)}"]`);
+  const pill = card?.querySelector('.members-pill');
+  if (pill){
+    pill.dataset.count = String(newCount);
+    pill.textContent = `${newCount} member${newCount===1?'':'s'}`;
   }
 }
 
-/* ---------- Init ---------- */
-async function init(){
+// ===== init =====
+(async function init() {
   await loadUser();
-  page=1; pages=1;
-  await Promise.all([ loadMine(), loadGroups() ]);
-  syncNoSectionVisibility();
-}
-if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init) } else { init() }
+  await loadUserSettings();
+  await loadProfilePosts();     // only my posts
+  await loadMyGroups();         // my groups (owned + member)
+})();

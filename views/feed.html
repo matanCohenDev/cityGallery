@@ -6,23 +6,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="CityGallery feed — posts from people you follow." />
   <link rel="stylesheet" href="/CSS/feed.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
   <!-- Header -->
   <header class="header">
     <div class="container nav">
       <a class="brand" href="/">
-        <span class="logo" aria-hidden="true"></span>
+        <span class="logo" aria-hidden="true">🏙️</span>
         <span class="brand-name">CityGallery</span>
       </a>
 
       <nav class="topnav" aria-label="Primary">
-        <a class="toplink" href="/profile">My Profile</a>
+        <a class="toplink active" href="/feed" aria-current="page">Feed</a>
+        <a class="toplink" href="/profile">Profile</a>
       </nav>
 
       <div class="nav-actions">
         <span id="userBadge" class="badge muted">Not signed in</span>
-        <button id="newPostBtn" class="btn btn--primary">New Post</button>
+        <button id="newPostBtn" class="btn btn--primary">✨ New Post</button>
         <button id="logoutBtn" class="btn">Log out</button>
       </div>
     </div>
@@ -33,22 +35,22 @@
     <div class="container toolbar__row">
       <div class="toolbar__left">
         <div class="input-wrap" role="search">
-          <input id="q" class="input" placeholder="Search posts…" aria-label="Search posts" />
+          <input id="q" class="input" placeholder="🔍 Search posts, people, places..." aria-label="Search posts" />
         </div>
 
         <div class="filters" role="region" aria-label="Filters">
           <label class="chk">
             <input type="checkbox" id="imagesOnly" />
-            <span>With images only</span>
+            <span>📸 With images only</span>
           </label>
-          <label class="lbl">Day
+          <label class="lbl">📅 Date
             <input id="day" class="input" type="date" />
           </label>
         </div>
       </div>
 
       <div class="toolbar__right" role="region" aria-label="Grouping">
-        <label class="lbl">Group by
+        <label class="lbl">📊 Group by
           <select id="groupBy" class="input">
             <option value="">None</option>
             <option value="day">Day</option>
@@ -56,7 +58,7 @@
             <option value="group">Group</option>
           </select>
         </label>
-        <label class="lbl">Items / group
+        <label class="lbl">📋 Items / group
           <input id="itemsPerGroup" class="input" type="number" min="1" max="20" value="5" />
         </label>
       </div>
@@ -73,8 +75,8 @@
         <div class="empty__card">
           <div class="empty__icon">🌆</div>
           <h3>No posts yet</h3>
-          <p class="muted">Try a different search, or create the very first post.</p>
-          <button class="btn btn--primary" id="emptyNewPost">Create Post</button>
+          <p class="muted">Be the first to share a moment from your city!</p>
+          <button class="btn btn--primary" id="emptyNewPost">✨ Create Post</button>
         </div>
       </div>
     </main>
@@ -82,7 +84,7 @@
     <!-- JOINABLE SIDEBAR -->
     <aside id="joinable" class="joinable hidden" aria-label="Groups you can join">
       <div class="joinable__head">
-        <h3 class="joinable__title">Discover groups</h3>
+        <h3 class="joinable__title">🌟 Discover Groups</h3>
       </div>
       <ul id="joinableList" class="joinable__list" aria-live="polite"></ul>
     </aside>
@@ -92,23 +94,23 @@
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal__card" role="document">
       <div class="modal__header">
-        <h3 id="modalTitle">Create a new post</h3>
+        <h3 id="modalTitle">✨ Create a new post</h3>
         <button id="closeModal" class="icon-btn" aria-label="Close">✕</button>
       </div>
 
       <form id="postForm" class="modal__body">
         <fieldset class="fieldset">
-          <legend>Content</legend>
+          <legend>📝 Content</legend>
           <label>Title
-            <input class="input" name="title" placeholder="A moment in the city" required />
+            <input class="input" name="title" placeholder="A beautiful moment in the city..." required />
           </label>
           <label>Content
-            <textarea class="input" name="content" rows="4" placeholder="Write a short caption…" required></textarea>
+            <textarea class="input" name="content" rows="4" placeholder="Share your thoughts about this place..." required></textarea>
           </label>
         </fieldset>
 
         <fieldset class="fieldset">
-          <legend>Media</legend>
+          <legend>📸 Media</legend>
           <label>Image (local)
             <input class="input" name="imageFile" type="file" accept="image/*" />
           </label>
@@ -118,12 +120,27 @@
         <div class="actions">
           <button type="button" class="btn" id="clearForm">Clear</button>
           <button type="button" class="btn" id="cancelPost">Cancel</button>
-          <button type="submit" class="btn btn--primary">Publish</button>
+          <button type="submit" class="btn btn--primary">🚀 Publish</button>
         </div>
       </form>
     </div>
   </div>
-
+  
+  <!-- Post Preview Modal -->
+  <div id="previewModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
+    <div class="modal__card" role="document">
+      <div class="modal__header">
+        <h3 id="previewTitle">👀 Post preview</h3>
+        <button id="closePreview" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="modal__body">
+        <div id="previewContent" class="preview">
+          <!-- ימולא דינמית -->
+        </div>
+      </div>
+    </div>
+  </div>
+  
   <script src="/JS/feed.js"></script>
 </body>
 </html>

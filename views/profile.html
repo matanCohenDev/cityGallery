@@ -7,19 +7,20 @@
   <meta name="description" content="Your posts and stats." />
   <link rel="stylesheet" href="/CSS/feed.css" />
   <link rel="stylesheet" href="/CSS/profile.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     /* תוספות קלות ל-UI של קבוצות (נשען על ה-design הקיים) */
-    .groups-grid{ list-style:none;margin:0;padding:0;display:grid;gap:14px;grid-template-columns:repeat(12,1fr) }
-    .groups-grid .card{ grid-column:span 6; display:flex;gap:10px;align-items:center }
-    .group__meta{ display:grid; gap:4px; flex:1; padding:8px 0 }
-    .group__name{ margin:0; font-weight:700 }
-    .group__desc{ margin:0; color:#475569; font-size:.95rem }
-    .pill{ display:inline-block; padding:4px 8px; border-radius:999px; border:1px solid var(--line); background:#fff; font-size:.85rem; color:#334155 }
+    .groups-grid{ list-style:none;margin:0;padding:0;display:grid;gap:20px;grid-template-columns:repeat(12,1fr) }
+    .groups-grid .card{ grid-column:span 6; display:flex;gap:16px;align-items:center; padding:20px; }
+    .group__meta{ display:grid; gap:6px; flex:1; padding:12px 0 }
+    .group__name{ margin:0; font-weight:900; font-size:1.25rem; color:#1e293b; }
+    .group__desc{ margin:0; color:#475569; font-size:1rem; line-height:1.5; }
+    .pill{ display:inline-block; padding:6px 12px; border-radius:999px; border:1px solid var(--line); background:#fff; font-size:.9rem; color:#475569; font-weight:600; }
     @media (max-width:860px){ .groups-grid .card{ grid-column:span 12 } }
 
     /* כפתורי Post */
-    .btn-danger{background:#ef4444;color:#fff;border:0}
-    .btn-danger:hover{filter:brightness(1.05)}
+    .btn-danger{background:var(--danger);color:#fff;border:0;font-weight:700}
+    .btn-danger:hover{filter:brightness(1.1);transform:translateY(-1px)}
 
     /* מודאל יצירת קבוצה */
     .modal .hint{ color:#64748b; font-size:.9rem }
@@ -32,18 +33,19 @@
   <header class="header">
     <div class="container nav">
       <a class="brand" href="/">
-        <span class="logo" aria-hidden="true"></span>
+        <span class="logo" aria-hidden="true">🏙️</span>
         <span class="brand-name">CityGallery</span>
       </a>
 
       <nav class="topnav" aria-label="Primary">
-        <a class="toplink" href="/feed" aria-current="page">Feed</a>
-        <a class="toplink" id="openSettings" href="#">Settings</a>
+        <a class="toplink" href="/feed">Feed</a>
+        <a class="toplink active" href="/profile" aria-current="page">Profile</a>
+        <a class="toplink" href="#" id="openSettings">⚙️ Settings</a>
       </nav>
 
       <div class="nav-actions">
         <span id="userBadge" class="badge muted">Not signed in</span>
-        <button id="newPostBtn" class="btn btn--primary">New Post</button>
+        <button id="newPostBtn" class="btn btn--primary">✨ New Post</button>
         <button id="logoutBtn" class="btn">Log out</button>
       </div>
     </div>
@@ -52,10 +54,10 @@
   <!-- Profile header -->
   <section class="profile-hero">
     <div class="container hero__row">
-      <div class="avatar xl" id="avatarHero" aria-hidden="true"></div>
+      <div class="avatar xl" id="avatarHero" aria-hidden="true">👤</div>
       <div class="hero__meta">
         <h1 id="profileName">My Profile</h1>
-        <p class="muted" id="profileSubtitle">Your posts and statuses</p>
+        <p class="muted" id="profileSubtitle">📸 Your city moments and stories</p>
         <div class="hero__stats" id="heroStats" aria-live="polite"></div>
       </div>
     </div>
@@ -67,9 +69,9 @@
     <!-- Groups (NEW) -->
     <section class="profile-section" id="sectionGroups">
       <div class="section-head">
-        <h2>My Groups</h2>
+        <h2>👥 My Groups</h2>
         <div style="display:flex;gap:8px;align-items:center">
-          <button id="openCreateGroup2" class="btn btn--primary">Create Group</button>
+          <button id="openCreateGroup2" class="btn btn--primary">✨ Create Group</button>
         </div>
       </div>
 
@@ -85,8 +87,8 @@
           <div class="empty__card">
             <div class="empty__icon">👥</div>
             <h3>No joined groups</h3>
-            <p class="muted">Join public groups from the feed or create your own.</p>
-            <button class="btn" id="emptyCreateGroup2">Create Group</button>
+            <p class="muted">Join public groups from the feed or create your own community!</p>
+            <button class="btn" id="emptyCreateGroup2">✨ Create Group</button>
           </div>
         </div>
       </div>
@@ -95,15 +97,15 @@
     <!-- With images -->
     <section class="profile-section" id="sectionWith">
       <div class="section-head">
-        <h2>posts<span class="count" id="countWith">(0)</span></h2>
+        <h2>📸 Photo Posts<span class="count" id="countWith">(0)</span></h2>
       </div>
-      <ul id="gridWith" class="card-grid" aria-live="polite"></ul>
+      <ul id="gridWith" class="feed-list" aria-live="polite"></ul>
       <div id="emptyWith" class="empty hidden">
         <div class="empty__card">
           <div class="empty__icon">🖼️</div>
-          <h3>No image posts</h3>
-          <p class="muted">Try removing filters or create a post with an image.</p>
-          <button class="btn btn--primary" id="emptyNewPost1">Create Post</button>
+          <h3>No photo posts yet</h3>
+          <p class="muted">Share your first photo from the city!</p>
+          <button class="btn btn--primary" id="emptyNewPost1">✨ Create Post</button>
         </div>
       </div>
     </section>
@@ -111,15 +113,15 @@
     <!-- Without images -->
     <section class="profile-section" id="sectionNo">
       <div class="section-head">
-        <h2>statuses<span class="count" id="countNo">(0)</span></h2>
+        <h2>💭 Text Posts<span class="count" id="countNo">(0)</span></h2>
       </div>
-      <ul id="gridNo" class="card-grid card-grid--noimg" aria-live="polite"></ul>
+      <ul id="gridNo" class="feed-list" aria-live="polite"></ul>
       <div id="emptyNo" class="empty hidden">
         <div class="empty__card">
           <div class="empty__icon">🗂️</div>
-          <h3>No text-only posts</h3>
-          <p class="muted">Try removing filters or create a text-only post.</p>
-          <button class="btn btn--primary" id="emptyNewPost2">Create Post</button>
+          <h3>No text posts yet</h3>
+          <p class="muted">Share your thoughts about the city!</p>
+          <button class="btn btn--primary" id="emptyNewPost2">✨ Create Post</button>
         </div>
       </div>
     </section>
@@ -129,22 +131,22 @@
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal__card" role="document">
       <div class="modal__header">
-        <h3 id="modalTitle">Create a new post</h3>
+        <h3 id="modalTitle">✨ Create a new post</h3>
         <button id="closeModal" class="icon-btn" aria-label="Close">✕</button>
       </div>
 
       <form id="postForm" class="modal__body" novalidate>
         <fieldset class="fieldset">
-          <legend>Content</legend>
+          <legend>📝 Content</legend>
           <label>Title
-            <input class="input" name="title" placeholder="A moment in the city" required />
+            <input class="input" name="title" placeholder="A beautiful moment in the city..." required />
           </label>
           <label>Content
-            <textarea class="input" name="content" rows="4" placeholder="Write a short caption…" required></textarea>
+            <textarea class="input" name="content" rows="4" placeholder="Share your thoughts about this place..." required></textarea>
           </label>
         </fieldset>
         <fieldset class="fieldset">
-          <legend>Media</legend>
+          <legend>📸 Media</legend>
           <label>Image (local)
             <input class="input" name="imageFile" type="file" accept="image/*" />
           </label>
@@ -153,7 +155,7 @@
         <div class="actions">
           <button type="button" class="btn" id="clearForm">Clear</button>
           <button type="button" class="btn" id="cancelPost">Cancel</button>
-          <button type="submit" class="btn btn--primary">Publish</button>
+          <button type="submit" class="btn btn--primary">🚀 Publish</button>
         </div>
       </form>
     </div>
@@ -163,7 +165,7 @@
   <div id="viewModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="viewTitle">
     <div class="modal__card view-modal" role="document">
       <div class="modal__header">
-        <h3 id="viewTitle">Post</h3>
+        <h3 id="viewTitle">👀 Post Details</h3>
         <button id="closeView" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="modal__body" id="viewBody"></div>
@@ -174,13 +176,13 @@
   <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
     <div class="modal__card" role="document">
       <div class="modal__header">
-        <h3 id="settingsTitle">edit profile</h3>
+        <h3 id="settingsTitle">⚙️ Edit Profile</h3>
         <button id="closeSettings" class="icon-btn" aria-label="Close">✕</button>
       </div>
 
       <form id="settingsForm" class="modal__body" novalidate>
         <fieldset class="fieldset">
-          <legend>Profile</legend>
+          <legend>👤 Profile Info</legend>
           <label>Username
             <input class="input" name="username" placeholder="Your username" />
           </label>
@@ -190,7 +192,7 @@
         </fieldset>
 
         <fieldset class="fieldset">
-          <legend>Password</legend>
+          <legend>🔐 Password</legend>
           <label>Current password
             <input class="input" name="currentPassword" type="password" autocomplete="current-password" />
           </label>
@@ -200,12 +202,12 @@
           <label>Confirm new password
             <input class="input" name="confirmPassword" type="password" autocomplete="new-password" />
           </label>
-          <small class="muted">השאר ריק אם אינך מעדכן סיסמה</small>
+          <small class="muted">Leave empty if you don't want to change password</small>
         </fieldset>
 
         <div class="actions">
           <button type="button" class="btn" id="cancelSettings">Cancel</button>
-          <button type="submit" class="btn btn--primary" id="saveSettings">Save changes</button>
+          <button type="submit" class="btn btn--primary" id="saveSettings">💾 Save changes</button>
         </div>
       </form>
     </div>
@@ -215,22 +217,22 @@
   <div id="editModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="editTitle">
     <div class="modal__card view-modal" role="document">
       <div class="modal__header">
-        <h3 id="editTitle">Edit post</h3>
+        <h3 id="editTitle">✏️ Edit post</h3>
         <button id="closeEdit" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <form id="editForm" class="modal__body" novalidate>
         <div id="editPreviewBox"></div>
         <fieldset class="fieldset">
-          <legend>Content</legend>
+          <legend>📝 Content</legend>
           <label>Title
             <input class="input" name="title" placeholder="Post title" required />
           </label>
           <label>Text
-            <textarea class="input" name="content" rows="4" placeholder="Write something…" required></textarea>
+            <textarea class="input" name="content" rows="4" placeholder="Write something..." required></textarea>
           </label>
         </fieldset>
         <fieldset class="fieldset">
-          <legend>Image</legend>
+          <legend>📸 Image</legend>
           <label>Replace image
             <input class="input" name="imageFile" type="file" accept="image/*" />
           </label>
@@ -242,7 +244,7 @@
         </fieldset>
         <div class="actions">
           <button type="button" class="btn" id="cancelEdit">Cancel</button>
-          <button type="submit" class="btn btn--primary">Save changes</button>
+          <button type="submit" class="btn btn--primary">💾 Save changes</button>
         </div>
       </form>
     </div>
@@ -252,12 +254,12 @@
   <div id="groupModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="groupTitle">
     <div class="modal__card" role="document">
       <div class="modal__header">
-        <h3 id="groupTitle">Create a new group</h3>
+        <h3 id="groupTitle">✨ Create a new group</h3>
         <button id="closeGroup" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <form id="groupForm" class="modal__body" novalidate>
         <fieldset class="fieldset">
-          <legend>Basics</legend>
+          <legend>📋 Basics</legend>
           <div class="row">
             <label>Name
               <input class="input" name="name" placeholder="Tel-Aviv Photography" required />
@@ -266,7 +268,7 @@
           <label>Description
             <textarea class="input" name="description" rows="3" placeholder="What is this group about?" required></textarea>
           </label>
-          <div class="hint">You’ll be the first admin. You can add more later.</div>
+          <div class="hint">You'll be the first admin. You can add more later.</div>
         </fieldset>
 
         <fieldset class="fieldset">
@@ -275,24 +277,36 @@
 
         <div class="actions">
           <button type="button" class="btn" id="cancelGroup">Cancel</button>
-          <button type="submit" class="btn btn--primary">Create group</button>
+          <button type="submit" class="btn btn--primary">🚀 Create group</button>
         </div>
       </form>
     </div>
   </div>
 
+  <!-- Preview Modal (NEW) -->
+  <div id="previewModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
+    <div class="modal__card" role="document">
+      <div class="modal__header">
+        <h3 id="previewTitle">👀 Post Preview</h3>
+        <button id="closePreview" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <div class="modal__body" id="previewContent"></div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
-<!-- Members Modal (NEW) -->
+  
+  <!-- Members Modal (NEW) -->
   <div id="membersModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="membersTitle">
     <div class="modal__card" role="document">
       <div class="modal__header">
-        <h3 id="membersTitle">Group Members</h3>
+        <h3 id="membersTitle">👥 Group Members</h3>
         <button id="closeMembers" class="icon-btn" aria-label="Close">✕</button>
       </div>
       <div class="modal__body">
         <div style="display:flex;gap:8px;align-items:center">
-          <input id="membersSearch" class="input" placeholder="Search members…" />
+          <input id="membersSearch" class="input" placeholder="🔍 Search members..." />
           <span class="muted" id="membersCount">(0)</span>
         </div>
         <ul id="membersList" class="members-list" aria-live="polite"></ul>

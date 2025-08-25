@@ -1,11 +1,20 @@
+// server/models/posts_model.js
 const mongoose = require('mongoose');
+const { Schema, Types } = mongoose;
 
-const postSchema = new mongoose.Schema({
-  title:     { type: String, required: true, trim: true, maxlength: 120 },
-  content:   { type: String, required: true, trim: true, maxlength: 4000 },
-  images:    [{ type: String }], 
-  author:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  group:     { type: mongoose.Schema.Types.ObjectId, ref: 'Group' }, 
+const CommentSchema = new Schema({
+  user:      { type: Types.ObjectId, ref: 'User', required: true },
+  text:      { type: String, required: true, trim: true, maxlength: 2000 },
+  createdAt: { type: Date, default: Date.now }
+}, { _id: true });
+
+const postSchema = new Schema({
+  title:   { type: String, required: true, trim: true, maxlength: 120 },
+  content: { type: String, required: true, trim: true, maxlength: 4000 },
+  images:  [{ type: String }],
+  author:  { type: Types.ObjectId, ref: 'User', required: true },
+  group:   { type: Types.ObjectId, ref: 'Group' },
+
   location: {
     address: { type: String },
     coordinates: {
@@ -13,6 +22,14 @@ const postSchema = new mongoose.Schema({
       lng: { type: Number },
     }
   },
+
+  // --- חדש: לייקים ותגובות ---
+  likes:    [{ type: Types.ObjectId, ref: 'User' }],
+  comments: [CommentSchema],
+
 }, { timestamps: true });
+
+postSchema.index({ createdAt: -1 });
+postSchema.index({ title: 'text', content: 'text' });
 
 module.exports = mongoose.model('Post', postSchema);
